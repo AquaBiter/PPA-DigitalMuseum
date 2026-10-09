@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Slide validation
+    function isValidSlide(data) {
+      return data.keys().hasAll(['id', 'titleHighlight', 'titleSuffix', 'subtitle', 'color']) &&
+        data.id is string && data.id.size() <= 100 &&
+        data.titleHighlight is string && data.titleHighlight.size() <= 120 &&
+        data.titleSuffix is string && data.titleSuffix.size() <= 120 &&
+        data.subtitle is string && data.subtitle.size() <= 300 &&
+        data.color is string && data.color.size() <= 30;
+    }
+
+    // Category validation
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'name', 'summary', 'fullDescription', 'accentColor']) &&
+        data.id is string && data.id.size() <= 100 &&
+        data.name is string && data.name.size() <= 150 &&
+        data.summary is string && data.summary.size() <= 400 &&
+        data.fullDescription is string && data.fullDescription.size() <= 3000 &&
+        data.accentColor is string && data.accentColor.size() <= 30;
+    }
+
+    // Artifact validation
+    function isValidArtifact(data) {
+      return data.keys().hasAll(['id', 'categoryId', 'title', 'description', 'notes']) &&
+        data.id is string && data.id.size() <= 100 &&
+        data.categoryId is string && data.categoryId.size() <= 100 &&
+        data.title is string && data.title.size() <= 200 &&
+        data.description is string && data.description.size() <= 4000 &&
+        data.notes is string && data.notes.size() <= 3000;
+    }
+
+    // Question validation
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['id', 'categoryId', 'questionText', 'correctChoiceId']) &&
+        data.id is string && data.id.size() <= 100 &&
+        data.categoryId is string && data.categoryId.size() <= 100 &&
+        data.questionText is string && data.questionText.size() <= 1000 &&
+        data.correctChoiceId is string && data.correctChoiceId.size() <= 100;
+    }
+
+    // Public test doc for connection testing
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Slides
+    match /slides/{slideId} {
+      allow get, list: if true;
+      allow create: if isValidId(slideId) && isValidSlide(incoming());
+      allow update: if isValidId(slideId) && isValidSlide(incoming());
+      allow delete: if isValidId(slideId);
+    }
+
+    // Categories
+    match /categories/{categoryId} {
+      allow get, list: if true;
+      allow create: if isValidId(categoryId) && isValidCategory(incoming());
+      allow update: if isValidId(categoryId) && isValidCategory(incoming());
+      allow delete: if isValidId(categoryId);
+    }
+
+    // Artifacts
+    match /artifacts/{artifactId} {
+      allow get, list: if true;
+      allow create: if isValidId(artifactId) && isValidArtifact(incoming());
+      allow update: if isValidId(artifactId) && isValidArtifact(incoming());
+      allow delete: if isValidId(artifactId);
+    }
+
+    // Questions
+    match /questions/{questionId} {
+      allow get, list: if true;
+      allow create: if isValidId(questionId) && isValidQuestion(incoming());
+      allow update: if isValidId(questionId) && isValidQuestion(incoming());
+      allow delete: if isValidId(questionId);
+    }
+
+    // About & metadata
+    match /config/{configId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(configId);
+      allow delete: if isValidId(configId);
+    }
+  }
+}

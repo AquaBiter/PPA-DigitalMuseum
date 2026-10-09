@@ -1,0 +1,221 @@
+{
+  "entities": {
+    "Slide": {
+      "title": "Hero Slide",
+      "description": "Represents an archival showcase hero banner slide on the homepage.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the slide",
+          "maxLength": 100
+        },
+        "titleHighlight": {
+          "type": "string",
+          "description": "Highlighted word of the slide title",
+          "maxLength": 120
+        },
+        "titleSuffix": {
+          "type": "string",
+          "description": "Trailing portion of the slide title",
+          "maxLength": 120
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Descriptive subtitle explaining the archival focus",
+          "maxLength": 300
+        },
+        "color": {
+          "type": "string",
+          "description": "Hex or CSS color highlight",
+          "maxLength": 30
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Optional image URL for the slide banner",
+          "maxLength": 2048
+        }
+      },
+      "required": ["id", "titleHighlight", "titleSuffix", "subtitle", "color"]
+    },
+    "Category": {
+      "title": "Category Topic",
+      "description": "One of the 5 core thematic categories covering 2000-2010 Philippine popular culture.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Slug identifier of the category topic",
+          "maxLength": 100
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the topic",
+          "maxLength": 150
+        },
+        "summary": {
+          "type": "string",
+          "description": "Brief card overview of the category",
+          "maxLength": 400
+        },
+        "fullDescription": {
+          "type": "string",
+          "description": "Detailed curatorial narrative for the category view",
+          "maxLength": 2000
+        },
+        "accentColor": {
+          "type": "string",
+          "description": "Accent hex color for theme badges",
+          "maxLength": 30
+        },
+        "bannerImageUrl": {
+          "type": "string",
+          "description": "Optional custom banner image URL for category",
+          "maxLength": 2048
+        }
+      },
+      "required": ["id", "name", "summary", "fullDescription", "accentColor"]
+    },
+    "Artifact": {
+      "title": "Museum Artifact",
+      "description": "A preserved 2000-2010 cultural relic, device, or pop culture item.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique slug for the artifact",
+          "maxLength": 100
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Foreign key pointing to parent category",
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the artifact",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "description": "Historical description and significance",
+          "maxLength": 3000
+        },
+        "notes": {
+          "type": "string",
+          "description": "Key takeaways, insights, or curatorial notes",
+          "maxLength": 2000
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Image asset URL",
+          "maxLength": 2048
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "Archival video embed URL",
+          "maxLength": 500
+        },
+        "videoTitle": {
+          "type": "string",
+          "description": "Title of the embedded archival video",
+          "maxLength": 200
+        }
+      },
+      "required": ["id", "categoryId", "title", "description", "notes"]
+    },
+    "QuizQuestion": {
+      "title": "Interactive Quiz Question",
+      "description": "Multiple choice trivia question for educational engagement per topic.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID of the question",
+          "maxLength": 100
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Associated category ID",
+          "maxLength": 100
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "Optional linked artifact ID",
+          "maxLength": 100
+        },
+        "questionText": {
+          "type": "string",
+          "description": "Prompt text of the question",
+          "maxLength": 1000
+        },
+        "correctChoiceId": {
+          "type": "string",
+          "description": "ID of the correct choice",
+          "maxLength": 100
+        },
+        "explanation": {
+          "type": "string",
+          "description": "Historical commentary revealed upon answering",
+          "maxLength": 2000
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Optional illustration or reference image URL",
+          "maxLength": 2048
+        }
+      },
+      "required": ["id", "categoryId", "questionText", "correctChoiceId"]
+    },
+    "AboutContent": {
+      "title": "About & Timeline Content",
+      "description": "Curatorial statements and decade timeline for PopPinoyArchives.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Document identifier",
+          "maxLength": 100
+        },
+        "paragraph1": {
+          "type": "string",
+          "description": "Primary mission statement",
+          "maxLength": 3000
+        },
+        "paragraph2": {
+          "type": "string",
+          "description": "Decade scope and historical preservation statement",
+          "maxLength": 3000
+        },
+        "timelineTitle": {
+          "type": "string",
+          "description": "Heading for the cultural timeline section",
+          "maxLength": 200
+        }
+      },
+      "required": ["id", "paragraph1", "paragraph2"]
+    }
+  },
+  "firestore": {
+    "/slides/{slideId}": {
+      "schema": "Slide",
+      "description": "Collection of hero showcase slides."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of the 5 main pop culture topics."
+    },
+    "/artifacts/{artifactId}": {
+      "schema": "Artifact",
+      "description": "Collection of cultural relics and archival items."
+    },
+    "/questions/{questionId}": {
+      "schema": "QuizQuestion",
+      "description": "Collection of quiz trivia questions per category."
+    },
+    "/config/about": {
+      "schema": "AboutContent",
+      "description": "Singleton curatorial statement and timeline documentation."
+    }
+  }
+}
