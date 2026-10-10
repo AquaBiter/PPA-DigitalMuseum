@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, VolumeX } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface WebsiteIntroProps {
   onFinish: () => void;
@@ -14,7 +14,6 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   });
 
   const [hasVideoError, setHasVideoError] = useState<boolean>(false);
-  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Update orientation if resized before playback starts
@@ -55,7 +54,7 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   const currentList = isPortrait ? portraitCandidates : landscapeCandidates;
   const currentVideoSrc = currentList[candidateIndex] || currentList[0];
 
-  // Play video with sound immediately
+  // Play video with sound automatically
   useEffect(() => {
     const video = videoRef.current;
     if (!video || hasVideoError) return;
@@ -69,38 +68,51 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
-          setIsAudioMuted(false);
+          // Playing with sound automatically!
         })
         .catch(() => {
-          // If browser policy blocks sound without user gesture, start muted
+          // If browser temporarily blocks sound before first gesture:
+          // Start video rolling and automatically unmute on the very first mouse move, scroll, or touch
           video.muted = true;
-          setIsAudioMuted(true);
           video.play().catch(() => {});
+
+          const autoEnableAudio = () => {
+            if (videoRef.current) {
+              const wasMuted = videoRef.current.muted;
+              videoRef.current.muted = false;
+              videoRef.current.volume = 1.0;
+              // If video was playing muted during the first second, rewind to 0 so full sound is heard
+              if (wasMuted && videoRef.current.currentTime > 0.4 && videoRef.current.currentTime < 2.5) {
+                videoRef.current.currentTime = 0;
+              }
+              videoRef.current.play().catch(() => {});
+            }
+            cleanupListeners();
+          };
+
+          const interactionEvents = [
+            'pointermove',
+            'pointerdown',
+            'mousemove',
+            'mousedown',
+            'touchstart',
+            'keydown',
+            'wheel',
+            'scroll',
+            'focus',
+          ];
+
+          const cleanupListeners = () => {
+            interactionEvents.forEach((evt) => {
+              window.removeEventListener(evt, autoEnableAudio);
+            });
+          };
+
+          interactionEvents.forEach((evt) => {
+            window.addEventListener(evt, autoEnableAudio, { passive: true, once: true });
+          });
         });
     }
-
-    const handleGlobalUnmute = () => {
-      if (videoRef.current) {
-        const wasMuted = videoRef.current.muted;
-        videoRef.current.muted = false;
-        videoRef.current.volume = 1.0;
-        setIsAudioMuted(false);
-        if (wasMuted && videoRef.current.currentTime > 0.5) {
-          videoRef.current.currentTime = 0;
-        }
-        videoRef.current.play().catch(() => {});
-      }
-    };
-
-    window.addEventListener('click', handleGlobalUnmute, { once: true });
-    window.addEventListener('touchstart', handleGlobalUnmute, { once: true });
-    window.addEventListener('keydown', handleGlobalUnmute, { once: true });
-
-    return () => {
-      window.removeEventListener('click', handleGlobalUnmute);
-      window.removeEventListener('touchstart', handleGlobalUnmute);
-      window.removeEventListener('keydown', handleGlobalUnmute);
-    };
   }, [currentVideoSrc, hasVideoError]);
 
   const handleVideoError = () => {
@@ -115,13 +127,8 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
 
   const handleScreenClick = () => {
     if (videoRef.current) {
-      const wasMuted = videoRef.current.muted || isAudioMuted;
       videoRef.current.muted = false;
       videoRef.current.volume = 1.0;
-      setIsAudioMuted(false);
-      if (wasMuted && videoRef.current.currentTime > 0.5) {
-        videoRef.current.currentTime = 0;
-      }
       if (videoRef.current.paused) {
         videoRef.current.play().catch(() => {});
       }
@@ -153,17 +160,6 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
             onClick={handleScreenClick}
             className="absolute inset-0 z-20 w-full h-full bg-transparent cursor-pointer"
           />
-
-          {/* Discreet unmute reminder if browser policy blocked unmuted autoplay */}
-          {isAudioMuted && (
-            <div
-              onClick={handleScreenClick}
-              className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-black/75 hover:bg-black/90 backdrop-blur-md px-3.5 py-2 rounded-full text-white text-xs font-semibold cursor-pointer border border-white/20 shadow-lg animate-pulse"
-            >
-              <VolumeX className="w-4 h-4 text-amber-400" />
-              <span>Tap anywhere to unmute audio</span>
-            </div>
-          )}
         </>
       ) : (
         /* Fallback 2000s Museum Splash if user hasn't added custom MP4 to /public/video/intro/ yet */
