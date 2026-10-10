@@ -1,6 +1,7 @@
-import React from 'react';
-import { ArrowRight, ArrowLeft, Layers } from 'lucide-react';
-import { Artifact } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ArrowRight, ArrowLeft, Layers, Play, Film } from 'lucide-react';
+import { Artifact, ArtifactVideo } from '../types';
+import { formatToYouTubeEmbed } from '../utils/youtube';
 
 interface ArtifactViewProps {
   artifact: Artifact;
@@ -9,27 +10,36 @@ interface ArtifactViewProps {
   onBackToTopic?: () => void;
 }
 
-// Convert various YouTube URL formats (watch?v=, youtu.be/, etc.) into direct embed URL
-function getYouTubeEmbedUrl(url: string): string {
-  if (!url) return '';
-  if (url.includes('youtube.com/embed/')) return url;
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-  if (match && match[1]) {
-    return `https://www.youtube.com/embed/${match[1]}`;
-  }
-  return url;
-}
-
 export const ArtifactView: React.FC<ArtifactViewProps> = ({
   artifact,
   availableArtifacts,
   onSelectArtifact,
   onBackToTopic,
 }) => {
-  const embedUrl = getYouTubeEmbedUrl(artifact.videoUrl);
   const cleanTitle = artifact.title.replace(/^(ex\.|ex)\s*/i, '');
   const cleanDescription = artifact.description.replace(/^(ex\.|ex)\s*/i, '');
   const cleanNotes = artifact.notes ? artifact.notes.replace(/^(ex\.|ex)\s*/i, '') : '';
+
+  // Extract multiple videos, falling back to legacy videoUrl if needed
+  const videoList: ArtifactVideo[] = useMemo(() => {
+    if (artifact.videos && artifact.videos.length > 0) {
+      const valid = artifact.videos.filter((v) => v.url && v.url.trim() !== '');
+      if (valid.length > 0) return valid;
+    }
+    return artifact.videoUrl && artifact.videoUrl.trim() !== ''
+      ? [{ id: 'default', url: artifact.videoUrl, title: artifact.videoTitle || cleanTitle }]
+      : [];
+  }, [artifact.videos, artifact.videoUrl, artifact.videoTitle, cleanTitle]);
+
+  const [activeVideoIndex, setActiveVideoIndex] = useState<number>(0);
+
+  // Reset active video index whenever selected artifact changes
+  useEffect(() => {
+    setActiveVideoIndex(0);
+  }, [artifact.id]);
+
+  const currentVideo = videoList[activeVideoIndex] || videoList[0];
+  const embedUrl = currentVideo ? formatToYouTubeEmbed(currentVideo.url) : '';
 
   // Determine indices for multiple artifacts in the current topic
   const currentIndex = availableArtifacts.findIndex((a) => a.id === artifact.id);
@@ -126,18 +136,42 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
               />
             </div>
 
-            {/* Video Section: Direct YouTube embed, no thumbnail overlay */}
+            {/* Video Section: Direct YouTube embed(s) with multiple video support */}
             <div>
-              <h3 className="text-xl sm:text-2xl font-bold text-zinc-900 mb-3">
-                video links:
-              </h3>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h3 className="text-xl sm:text-2xl font-bold text-zinc-900">
+                  Video Links {videoList.length > 1 ? `(${videoList.length})` : ''}:
+                </h3>
+              </div>
+
+              {/* Multiple Video Selection Tabs (if artifact has 2 or more videos) */}
+              {videoList.length > 1 && (
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {videoList.map((v, idx) => (
+                    <button
+                      key={v.id || idx}
+                      type="button"
+                      onClick={() => setActiveVideoIndex(idx)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeVideoIndex === idx
+                          ? 'bg-black text-white shadow-sm ring-2 ring-black'
+                          : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
+                      }`}
+                    >
+                      <Film className="w-3.5 h-3.5" />
+                      <span>{v.title || `Video ${idx + 1}`}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Direct Embedded Video Player Frame */}
               <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-300 shadow-md bg-black">
                 {embedUrl ? (
                   <iframe
+                    key={embedUrl}
                     src={embedUrl}
-                    title={artifact.videoTitle || cleanTitle}
+                    title={currentVideo?.title || artifact.videoTitle || cleanTitle}
                     className="w-full h-full border-0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
@@ -148,9 +182,12 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
                   </div>
                 )}
               </div>
-              {artifact.videoTitle && (
-                <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-medium">
-                  {artifact.videoTitle}
+
+              {/* Active Video Title / Description */}
+              {(currentVideo?.title || artifact.videoTitle) && (
+                <p className="text-xs sm:text-sm text-zinc-600 mt-2 font-semibold flex items-center gap-1.5">
+                  <Play className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                  <span>{currentVideo?.title || artifact.videoTitle}</span>
                 </p>
               )}
             </div>

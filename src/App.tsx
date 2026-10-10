@@ -27,6 +27,8 @@ import { HelpCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { playInteractionSound, startQuizMusic, stopQuizMusic } from './utils/audioManager';
 import { testConnection, fetchArchiveFromFirestore } from './firebase';
 
+import { formatToYouTubeEmbed } from './utils/youtube';
+
 // Helper to sanitize any legacy "ex." prefix from persisted localStorage data
 const sanitizeCategories = (cats: Category[]): Category[] =>
   cats.map((c) => ({
@@ -36,12 +38,37 @@ const sanitizeCategories = (cats: Category[]): Category[] =>
   }));
 
 const sanitizeArtifacts = (arts: Artifact[]): Artifact[] =>
-  arts.map((a) => ({
-    ...a,
-    title: a.title.replace(/^(ex\.|ex)\s*/i, ''),
-    description: a.description.replace(/^(ex\.|ex)\s*/i, ''),
-    notes: a.notes.replace(/^(ex\.|ex)\s*/i, ''),
-  }));
+  arts.map((a) => {
+    let videos = a.videos;
+    if (!videos || !Array.isArray(videos) || videos.length === 0) {
+      if (a.videoUrl && a.videoUrl.trim() !== '') {
+        videos = [
+          {
+            id: `vid-${a.id}-default`,
+            url: formatToYouTubeEmbed(a.videoUrl),
+            title: a.videoTitle || 'Main Archival Video',
+          },
+        ];
+      } else {
+        videos = [];
+      }
+    } else {
+      videos = videos.map((v, idx) => ({
+        ...v,
+        id: v.id || `vid-${a.id}-${idx}`,
+        url: formatToYouTubeEmbed(v.url),
+      }));
+    }
+    return {
+      ...a,
+      title: a.title.replace(/^(ex\.|ex)\s*/i, ''),
+      description: a.description.replace(/^(ex\.|ex)\s*/i, ''),
+      notes: a.notes.replace(/^(ex\.|ex)\s*/i, ''),
+      videos,
+      videoUrl: videos[0]?.url || a.videoUrl || '',
+      videoTitle: videos[0]?.title || a.videoTitle || '',
+    };
+  });
 
 const sanitizeQuestions = (qs: QuizQuestion[]): QuizQuestion[] =>
   qs.map((q) => ({

@@ -15,27 +15,15 @@ import {
   BookOpen,
   ArrowUp,
   ArrowDown,
-  ExternalLink,
-  Globe,
-  Database,
-  Cloud,
-  RefreshCw,
-  Server,
-  ShieldCheck,
+  Film,
+  Play,
+  Eye,
+  EyeOff,
+  ListPlus,
+  Video,
 } from 'lucide-react';
-import { Slide, Category, Artifact, QuizQuestion, AboutContent, TimelineMilestone } from '../types';
-import {
-  FIREBASE_PROJECT_ID,
-  FIRESTORE_DATABASE_ID,
-  FIREBASE_CONSOLE_URL,
-  FIREBASE_FIRESTORE_URL,
-  FIREBASE_HOSTING_URL,
-  FIREBASE_AUTH_URL,
-  FIREBASE_RULES_URL,
-  testConnection,
-  syncArchiveToFirestore,
-  fetchArchiveFromFirestore,
-} from '../firebase';
+import { Slide, Category, Artifact, ArtifactVideo, QuizQuestion, AboutContent, TimelineMilestone } from '../types';
+import { formatToYouTubeEmbed, parseMultipleYouTubeUrls, extractYouTubeId } from '../utils/youtube';
 
 interface AdminModalProps {
   slides: Slide[];
@@ -73,78 +61,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [activeTab, setActiveTab] = useState<'slides' | 'topics' | 'artifacts' | 'questions' | 'about' | 'firebase'>('artifacts');
+  const [activeTab, setActiveTab] = useState<'slides' | 'topics' | 'artifacts' | 'questions' | 'about'>('artifacts');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
-  const [isTestingConn, setIsTestingConn] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
 
-  const handleTestCloudConnection = async () => {
-    setIsTestingConn(true);
-    try {
-      const ok = await testConnection();
-      setConnectionStatus(ok ? 'connected' : 'error');
-      showToast(ok ? 'Firebase Firestore connected successfully!' : 'Connection issue. Check network.');
-    } catch {
-      setConnectionStatus('error');
-      showToast('Firebase connection test failed');
-    } finally {
-      setIsTestingConn(false);
-    }
-  };
-
-  const handlePushAllToFirestore = async () => {
-    setIsSyncingCloud(true);
-    try {
-      const res = await syncArchiveToFirestore(slides, categories, artifacts, questions, aboutContent);
-      if (res.success) {
-        showToast(`Successfully synced ${res.count} records to Cloud Firestore!`);
-      } else {
-        showToast(`Sync warning: ${res.error || 'Failed'}`);
-      }
-    } catch (e) {
-      showToast('Error syncing to Firestore');
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
-
-  const handlePullFromFirestore = async () => {
-    setIsSyncingCloud(true);
-    try {
-      const cloudData = await fetchArchiveFromFirestore();
-      let restoredCount = 0;
-      if (cloudData.slides && cloudData.slides.length > 0) {
-        onUpdateSlides(cloudData.slides);
-        restoredCount += cloudData.slides.length;
-      }
-      if (cloudData.categories && cloudData.categories.length > 0) {
-        onUpdateCategories(cloudData.categories);
-        restoredCount += cloudData.categories.length;
-      }
-      if (cloudData.artifacts && cloudData.artifacts.length > 0) {
-        onUpdateArtifacts(cloudData.artifacts);
-        restoredCount += cloudData.artifacts.length;
-      }
-      if (cloudData.questions && cloudData.questions.length > 0) {
-        onUpdateQuestions(cloudData.questions);
-        restoredCount += cloudData.questions.length;
-      }
-      if (cloudData.aboutContent) {
-        onUpdateAboutContent(cloudData.aboutContent);
-        restoredCount++;
-      }
-      if (restoredCount > 0) {
-        showToast(`Fetched & updated ${restoredCount} items from Cloud Firestore!`);
-      } else {
-        showToast('Firestore database currently has no records. You can push local data first!');
-      }
-    } catch {
-      showToast('Failed to pull from Firestore');
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
+  // States for YouTube video interactions in Artifacts
+  const [previewVideoId, setPreviewVideoId] = useState<string | null>(null);
+  const [bulkAddArtifactId, setBulkAddArtifactId] = useState<string | null>(null);
+  const [bulkAddText, setBulkAddText] = useState<string>('');
 
   // Topic filter for Questions tab to ensure questions are strictly per topic/category
   const [selectedQuestionCategory, setSelectedQuestionCategory] = useState<string>(() => {
@@ -341,6 +264,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       imageUrl: artifacts[0]?.imageUrl || '',
       videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
       videoTitle: 'Archival video footage',
+      videos: [
+        {
+          id: `vid-${Date.now()}-1`,
+          url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+          title: 'Archival video footage',
+        },
+      ],
     };
     onUpdateArtifacts([...artifacts, newArtifact]);
     showToast('New artifact created');
@@ -359,6 +289,134 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     onUpdateArtifacts(
       artifacts.map((a) => (a.id === id ? { ...a, [field]: val } : a))
     );
+  };
+
+  const handleAddVideoToArtifact = (artifactId: string) => {
+    onUpdateArtifacts(
+      artifacts.map((a) => {
+        if (a.id !== artifactId) return a;
+        const currentVideos: ArtifactVideo[] =
+          a.videos && a.videos.length > 0
+            ? [...a.videos]
+            : a.videoUrl
+            ? [{ id: `vid-${Date.now()}-1`, url: formatToYouTubeEmbed(a.videoUrl), title: a.videoTitle || 'Archival Video' }]
+            : [];
+        const newVideo: ArtifactVideo = {
+          id: `vid-${Date.now()}`,
+          url: '',
+          title: `Video ${currentVideos.length + 1}`,
+        };
+        const updated = [...currentVideos, newVideo];
+        return {
+          ...a,
+          videos: updated,
+          videoUrl: updated[0]?.url || '',
+        };
+      })
+    );
+    showToast('New video slot added');
+  };
+
+  const handleBulkAddVideosToArtifact = (artifactId: string, text: string) => {
+    const parsed = parseMultipleYouTubeUrls(text);
+    if (parsed.length === 0) {
+      alert('Please enter at least one valid YouTube URL.');
+      return;
+    }
+
+    onUpdateArtifacts(
+      artifacts.map((a) => {
+        if (a.id !== artifactId) return a;
+        const currentVideos: ArtifactVideo[] =
+          a.videos && a.videos.length > 0
+            ? [...a.videos]
+            : a.videoUrl
+            ? [{ id: `vid-${Date.now()}-1`, url: formatToYouTubeEmbed(a.videoUrl), title: a.videoTitle || 'Archival Video' }]
+            : [];
+
+        const newEntries: ArtifactVideo[] = parsed.map((p, idx) => ({
+          id: `vid-${Date.now()}-${idx}`,
+          url: p.url,
+          title: p.title || `Video ${currentVideos.length + idx + 1}`,
+        }));
+
+        const updated = [...currentVideos, ...newEntries];
+        return {
+          ...a,
+          videos: updated,
+          videoUrl: updated[0]?.url || a.videoUrl,
+        };
+      })
+    );
+
+    setBulkAddArtifactId(null);
+    setBulkAddText('');
+    showToast(`Added ${parsed.length} YouTube video links!`);
+  };
+
+  const handleMoveArtifactVideo = (artifactId: string, index: number, direction: 'up' | 'down') => {
+    onUpdateArtifacts(
+      artifacts.map((a) => {
+        if (a.id !== artifactId) return a;
+        const currentVideos: ArtifactVideo[] = a.videos && a.videos.length > 0
+          ? [...a.videos]
+          : [{ id: `vid-${a.id}`, url: a.videoUrl || '', title: a.videoTitle || 'Archival Video' }];
+
+        const targetIdx = direction === 'up' ? index - 1 : index + 1;
+        if (targetIdx < 0 || targetIdx >= currentVideos.length) return a;
+
+        const updated = [...currentVideos];
+        const [moved] = updated.splice(index, 1);
+        updated.splice(targetIdx, 0, moved);
+
+        return {
+          ...a,
+          videos: updated,
+          videoUrl: updated[0]?.url || a.videoUrl,
+        };
+      })
+    );
+  };
+
+  const handleUpdateArtifactVideo = (artifactId: string, videoId: string, field: 'url' | 'title', val: string) => {
+    onUpdateArtifacts(
+      artifacts.map((a) => {
+        if (a.id !== artifactId) return a;
+        const currentVideos: ArtifactVideo[] =
+          a.videos && a.videos.length > 0
+            ? [...a.videos]
+            : [{ id: videoId, url: a.videoUrl || '', title: a.videoTitle || 'Archival Video' }];
+        
+        // Auto-convert pasted YouTube URL into embed link
+        const finalVal = field === 'url' ? formatToYouTubeEmbed(val) : val;
+
+        const updated = currentVideos.map((v) => (v.id === videoId ? { ...v, [field]: finalVal } : v));
+        return {
+          ...a,
+          videos: updated,
+          videoUrl: updated[0]?.url || a.videoUrl,
+        };
+      })
+    );
+  };
+
+  const handleDeleteArtifactVideo = (artifactId: string, videoId: string) => {
+    onUpdateArtifacts(
+      artifacts.map((a) => {
+        if (a.id !== artifactId) return a;
+        const currentVideos: ArtifactVideo[] =
+          a.videos && a.videos.length > 0
+            ? a.videos
+            : [{ id: videoId, url: a.videoUrl || '', title: a.videoTitle || 'Archival Video' }];
+        const updated = currentVideos.filter((v) => v.id !== videoId);
+        return {
+          ...a,
+          videos: updated,
+          videoUrl: updated[0]?.url || '',
+        };
+      })
+    );
+    showToast('Video slot removed');
   };
 
   // --- CRUD: QUESTIONS (Strictly per Topic / Category) ---
@@ -583,31 +641,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Direct Firebase Quick Action Links */}
-          <a
-            href={FIREBASE_CONSOLE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-lg transition-colors cursor-pointer"
-            title="Open Firebase Console in new tab"
-          >
-            <Cloud className="w-3.5 h-3.5 text-amber-600" />
-            <span>Firebase Console</span>
-            <ExternalLink className="w-3 h-3 opacity-60" />
-          </a>
-
-          <a
-            href={FIREBASE_HOSTING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-semibold text-blue-800 hover:text-blue-950 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-3 py-2 rounded-lg transition-colors cursor-pointer"
-            title="Open Firebase Hosting in new tab"
-          >
-            <Globe className="w-3.5 h-3.5 text-blue-600" />
-            <span>Hosting</span>
-            <ExternalLink className="w-3 h-3 opacity-60" />
-          </a>
+        <div className="flex items-center gap-2">
 
           <button
             onClick={() => {
@@ -698,17 +732,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           About & Timeline ({aboutContent.milestones.length})
         </button>
 
-        <button
-          onClick={() => setActiveTab('firebase')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${
-            activeTab === 'firebase'
-              ? 'bg-amber-600 text-white shadow'
-              : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
-          }`}
-        >
-          <Cloud className="w-4 h-4" />
-          Firebase Console & Hosting
-        </button>
       </div>
 
       {/* TAB CONTENT: ARTIFACTS */}
@@ -817,17 +840,215 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Video URL */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-500 mb-1">
-                      Video Embed / Link URL
-                    </label>
-                    <input
-                      type="text"
-                      value={art.videoUrl}
-                      onChange={(e) => handleUpdateArtifactField(art.id, 'videoUrl', e.target.value)}
-                      className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-mono"
-                    />
+                  {/* Multiple YouTube Video Embed URLs */}
+                  <div className="bg-zinc-100 p-3 sm:p-4 rounded-xl border border-zinc-200 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-xs font-bold uppercase text-zinc-800">
+                            YouTube Video Embed URLs
+                          </label>
+                          <span className="text-[10px] font-bold bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded-full">
+                            {((art.videos && art.videos.length > 0) ? art.videos.length : (art.videoUrl ? 1 : 0))} video(s)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500">
+                          Add multiple YouTube links (embed, watch, youtu.be, or shorts). They auto-format to embed links.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (bulkAddArtifactId === art.id) {
+                              setBulkAddArtifactId(null);
+                            } else {
+                              setBulkAddArtifactId(art.id);
+                              setBulkAddText('');
+                            }
+                          }}
+                          className="flex items-center gap-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                          title="Paste and import multiple YouTube URLs at once"
+                        >
+                          <ListPlus className="w-3.5 h-3.5 text-zinc-700" />
+                          <span>{bulkAddArtifactId === art.id ? 'Close Bulk Add' : 'Bulk Add Multiple URLs'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddVideoToArtifact(art.id)}
+                          className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Video Link</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bulk Add Multiple URLs Collapsible Box */}
+                    {bulkAddArtifactId === art.id && (
+                      <div className="bg-white p-3.5 rounded-xl border-2 border-dashed border-zinc-300 space-y-2.5 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+                            <Video className="w-4 h-4 text-cyan-600" />
+                            Paste Multiple YouTube Video URLs
+                          </span>
+                          <span className="text-[10px] text-zinc-400">
+                            1 link per line, or comma-separated
+                          </span>
+                        </div>
+                        <textarea
+                          value={bulkAddText}
+                          onChange={(e) => setBulkAddText(e.target.value)}
+                          rows={3}
+                          placeholder={`Paste multiple YouTube URLs here, e.g.:\nhttps://www.youtube.com/watch?v=rP1Zc5oJ8aE\nhttps://youtu.be/Q4Xky3t8YmQ | Vintage Nokia Retrospective\nhttps://www.youtube.com/embed/dQw4w9WgXcQ`}
+                          className="w-full text-xs font-mono p-2.5 rounded-lg border border-zinc-300 bg-zinc-50 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBulkAddArtifactId(null);
+                              setBulkAddText('');
+                            }}
+                            className="text-xs font-semibold px-3 py-1.5 text-zinc-600 hover:text-black cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBulkAddVideosToArtifact(art.id, bulkAddText)}
+                            className="bg-black text-white hover:bg-zinc-800 text-xs font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                          >
+                            Import &amp; Add All Videos
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* List of video links */}
+                    <div className="space-y-3">
+                      {((art.videos && art.videos.length > 0)
+                        ? art.videos
+                        : [{ id: `vid-${art.id}`, url: art.videoUrl || '', title: art.videoTitle || 'Main Archival Video' }]
+                      ).map((vid, vIdx, arr) => {
+                        const ytId = extractYouTubeId(vid.url);
+                        const isPreviewing = previewVideoId === vid.id;
+
+                        return (
+                          <div key={vid.id || vIdx} className="bg-white p-3 rounded-lg border border-zinc-300 space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-zinc-700 uppercase flex items-center gap-1">
+                                  <Film className="w-3.5 h-3.5 text-zinc-500" />
+                                  Video #{vIdx + 1} {vIdx === 0 && <span className="text-[9px] text-cyan-700 bg-cyan-50 px-1.5 py-0.2 rounded font-bold uppercase">(Primary)</span>}
+                                </span>
+                                {ytId && (
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium">
+                                    ✓ ID: {ytId}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                {vid.url && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewVideoId(isPreviewing ? null : vid.id)}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                                      isPreviewing
+                                        ? 'bg-black text-white'
+                                        : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
+                                    }`}
+                                    title="Toggle preview video"
+                                  >
+                                    {isPreviewing ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                    <span>{isPreviewing ? 'Hide' : 'Preview'}</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveArtifactVideo(art.id, vIdx, 'up')}
+                                  disabled={vIdx === 0}
+                                  className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveArtifactVideo(art.id, vIdx, 'down')}
+                                  disabled={vIdx === arr.length - 1}
+                                  className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                </button>
+
+                                {arr.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteArtifactVideo(art.id, vid.id)}
+                                    className="p-1 text-red-500 hover:text-red-700 cursor-pointer ml-0.5"
+                                    title="Delete this video"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div className="sm:col-span-1">
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">
+                                  Video Title / Label
+                                </label>
+                                <input
+                                  type="text"
+                                  value={vid.title || ''}
+                                  onChange={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'title', e.target.value)}
+                                  placeholder="e.g. TV Commercial Clip"
+                                  className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-medium focus:ring-1 focus:ring-black"
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5 flex items-center justify-between">
+                                  <span>YouTube URL (watch?v=, youtu.be, /embed/, or shorts)</span>
+                                  {vid.url && !ytId && (
+                                    <span className="text-amber-600 font-normal">Check link format</span>
+                                  )}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={vid.url}
+                                  onChange={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'url', e.target.value)}
+                                  onBlur={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'url', formatToYouTubeEmbed(e.target.value))}
+                                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                                  className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-mono focus:ring-1 focus:ring-black"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Live Video Preview Box in Admin */}
+                            {isPreviewing && vid.url && (
+                              <div className="pt-2 border-t border-zinc-100">
+                                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black shadow-inner">
+                                  <iframe
+                                    src={formatToYouTubeEmbed(vid.url)}
+                                    title={vid.title || 'YouTube preview'}
+                                    className="w-full h-full border-0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1469,340 +1690,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: FIREBASE CONSOLE & HOSTING */}
-      {activeTab === 'firebase' && (
-        <div className="space-y-8 animate-fadeIn">
-          {/* Header Description */}
-          <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-200">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shrink-0">
-                  <Cloud className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bebas text-3xl text-zinc-900 tracking-wide">
-                    Firebase Console & Cloud Hosting
-                  </h3>
-                  <p className="text-sm text-zinc-600 mt-0.5">
-                    Live connection to Google Cloud Firestore database & Firebase Hosting for the Philippine Ports Authority Digital Museum.
-                  </p>
-                </div>
-              </div>
-
-              {/* Status indicator */}
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleTestCloudConnection}
-                  disabled={isTestingConn}
-                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg bg-white border border-zinc-300 text-zinc-800 hover:bg-zinc-50 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isTestingConn ? 'animate-spin' : ''}`} />
-                  {isTestingConn ? 'Testing...' : 'Test Connection'}
-                </button>
-
-                <div className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-xs font-semibold shadow-sm">
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      connectionStatus === 'connected'
-                        ? 'bg-emerald-500'
-                        : connectionStatus === 'error'
-                        ? 'bg-red-500'
-                        : 'bg-amber-400'
-                    }`}
-                  />
-                  <span className="text-zinc-700 capitalize">
-                    {connectionStatus === 'connected'
-                      ? 'Cloud Connected'
-                      : connectionStatus === 'error'
-                      ? 'Offline'
-                      : 'Active Project'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Launch Cards */}
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 mb-4">
-              Direct Firebase Console Launchpad
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Card 1: Main Firebase Console */}
-              <a
-                href={FIREBASE_CONSOLE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group p-5 rounded-2xl border border-zinc-200 bg-white hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <Cloud className="w-5 h-5" />
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-amber-600 transition-colors" />
-                  </div>
-                  <h5 className="font-bold text-zinc-900 group-hover:text-amber-600 text-base">
-                    Firebase Project Overview
-                  </h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    Access project settings, service accounts, and Google Cloud telemetry.
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                  <span>ID: {FIREBASE_PROJECT_ID}</span>
-                  <span className="text-amber-600 font-semibold group-hover:underline">Open Console &rarr;</span>
-                </div>
-              </a>
-
-              {/* Card 2: Cloud Firestore */}
-              <a
-                href={FIREBASE_FIRESTORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group p-5 rounded-2xl border border-zinc-200 bg-white hover:border-orange-400 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <Database className="w-5 h-5" />
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-orange-600 transition-colors" />
-                  </div>
-                  <h5 className="font-bold text-zinc-900 group-hover:text-orange-600 text-base">
-                    Cloud Firestore Database
-                  </h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    Inspect, search, and edit live museum documents (artifacts, questions, slides).
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400 font-mono truncate">
-                  <span className="truncate max-w-[160px]">DB: {FIRESTORE_DATABASE_ID}</span>
-                  <span className="text-orange-600 font-semibold group-hover:underline shrink-0">Open DB &rarr;</span>
-                </div>
-              </a>
-
-              {/* Card 3: Firebase Hosting */}
-              <a
-                href={FIREBASE_HOSTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group p-5 rounded-2xl border border-zinc-200 bg-white hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <Globe className="w-5 h-5" />
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-blue-600 transition-colors" />
-                  </div>
-                  <h5 className="font-bold text-zinc-900 group-hover:text-blue-600 text-base">
-                    Firebase Hosting Dashboard
-                  </h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    View active release versions, domains, rollbacks, and SSL certificates.
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                  <span>handy-envoy-b9v0l.web.app</span>
-                  <span className="text-blue-600 font-semibold group-hover:underline">Open Hosting &rarr;</span>
-                </div>
-              </a>
-
-              {/* Card 4: Firebase Authentication */}
-              <a
-                href={FIREBASE_AUTH_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group p-5 rounded-2xl border border-zinc-200 bg-white hover:border-emerald-400 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-emerald-600 transition-colors" />
-                  </div>
-                  <h5 className="font-bold text-zinc-900 group-hover:text-emerald-600 text-base">
-                    Authentication Console
-                  </h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    Manage museum admin users, login providers, and authentication logs.
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                  <span>Firebase Auth</span>
-                  <span className="text-emerald-600 font-semibold group-hover:underline">Open Auth &rarr;</span>
-                </div>
-              </a>
-
-              {/* Card 5: Security Rules */}
-              <a
-                href={FIREBASE_RULES_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group p-5 rounded-2xl border border-zinc-200 bg-white hover:border-purple-400 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <ShieldCheck className="w-5 h-5" />
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-purple-600 transition-colors" />
-                  </div>
-                  <h5 className="font-bold text-zinc-900 group-hover:text-purple-600 text-base">
-                    Firestore Security Rules
-                  </h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    View and audit deployed Firestore access rules and role security policies.
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                  <span>Deployed Rules</span>
-                  <span className="text-purple-600 font-semibold group-hover:underline">Open Rules &rarr;</span>
-                </div>
-              </a>
-
-              {/* Card 6: Live Production Link */}
-              <a
-                href={`https://${FIREBASE_PROJECT_ID}.web.app`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group p-5 rounded-2xl border border-zinc-200 bg-white hover:border-cyan-400 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <Server className="w-5 h-5" />
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-cyan-600 transition-colors" />
-                  </div>
-                  <h5 className="font-bold text-zinc-900 group-hover:text-cyan-600 text-base">
-                    Live Hosted App URL
-                  </h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    Preview your published production web app deployed to Google Cloud CDN.
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                  <span>web.app CDN</span>
-                  <span className="text-cyan-600 font-semibold group-hover:underline">Visit Site &rarr;</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          {/* Cloud Synchronization Hub */}
-          <div className="p-6 rounded-2xl border border-zinc-200 bg-zinc-50/70">
-            <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-zinc-200 gap-4">
-              <div>
-                <h4 className="font-bebas text-2xl text-zinc-900 tracking-wide flex items-center gap-2">
-                  <Database className="w-5 h-5 text-amber-600" />
-                  Cloud Data Synchronization Hub
-                </h4>
-                <p className="text-xs sm:text-sm text-zinc-600 mt-1">
-                  Synchronize all current topics, artifacts, quiz questions, hero slides, and timeline milestones to Google Cloud Firestore.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handlePullFromFirestore}
-                  disabled={isSyncingCloud}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-bold transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                  Pull from Cloud Firestore
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handlePushAllToFirestore}
-                  disabled={isSyncingCloud}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer"
-                >
-                  <Upload className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-bounce' : ''}`} />
-                  Push Local Archive to Cloud
-                </button>
-              </div>
-            </div>
-
-            {/* Current Sync Summary Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
-              <div className="p-3.5 rounded-xl bg-white border border-zinc-200 text-center">
-                <div className="text-2xl font-bebas font-bold text-zinc-900">{artifacts.length}</div>
-                <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">Artifacts</div>
-              </div>
-              <div className="p-3.5 rounded-xl bg-white border border-zinc-200 text-center">
-                <div className="text-2xl font-bebas font-bold text-zinc-900">{categories.length}</div>
-                <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">Categories</div>
-              </div>
-              <div className="p-3.5 rounded-xl bg-white border border-zinc-200 text-center">
-                <div className="text-2xl font-bebas font-bold text-zinc-900">{questions.length}</div>
-                <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">Quiz Q&amp;As</div>
-              </div>
-              <div className="p-3.5 rounded-xl bg-white border border-zinc-200 text-center">
-                <div className="text-2xl font-bebas font-bold text-zinc-900">{slides.length}</div>
-                <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">Hero Slides</div>
-              </div>
-              <div className="p-3.5 rounded-xl bg-white border border-zinc-200 text-center col-span-2 sm:col-span-1">
-                <div className="text-2xl font-bebas font-bold text-zinc-900">{aboutContent.milestones.length}</div>
-                <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">Milestones</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Firebase Hosting Deployment Guide for VS Code */}
-          <div className="p-6 rounded-2xl border border-zinc-200 bg-white">
-            <div className="flex items-start gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Globe className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bebas text-2xl text-zinc-900 tracking-wide">
-                  Deploying to Firebase Hosting via VS Code / Terminal
-                </h4>
-                <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-                  Your project is preconfigured with <code className="bg-zinc-100 px-1 py-0.5 rounded font-mono text-zinc-800">firebase.json</code> pointing to the <code className="bg-zinc-100 px-1 py-0.5 rounded font-mono text-zinc-800">dist</code> production folder.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3 mt-4 text-xs">
-              <div className="p-3 rounded-xl bg-zinc-900 text-zinc-100 font-mono text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <span>npm run build &amp;&amp; npx firebase deploy --only hosting</span>
-                <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-1 rounded">Single Command Deploy</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
-                  <div className="font-bold text-zinc-900 mb-1 flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    Production Hosting Domains
-                  </div>
-                  <ul className="space-y-1 text-zinc-600 font-mono text-[11px]">
-                    <li>• https://handy-envoy-b9v0l.web.app</li>
-                    <li>• https://handy-envoy-b9v0l.firebaseapp.com</li>
-                  </ul>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
-                  <div className="font-bold text-zinc-900 mb-1 flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    Preconfigured Settings
-                  </div>
-                  <p className="text-zinc-600 text-[11px] leading-relaxed">
-                    Single Page App (SPA) rewrites to index.html and Firestore security rules are enabled.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>

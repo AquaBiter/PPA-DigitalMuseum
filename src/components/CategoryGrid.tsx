@@ -176,14 +176,6 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
               style={{ backgroundColor: tutorialCategory.accentColor || '#06B6D4' }}
             />
 
-            {/* Close Button (No icon) */}
-            <button
-              onClick={() => setTutorialCategory(null)}
-              className="absolute top-5 right-5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer"
-              title="Close Tutorial"
-            >
-              Close
-            </button>
 
             {/* Header Badge (No icon) */}
             <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 mb-4">

@@ -16,6 +16,12 @@ export interface Category {
   bannerImageUrl?: string;
 }
 
+export interface ArtifactVideo {
+  id: string;
+  url: string;
+  title?: string;
+}
+
 export interface Artifact {
   id: string;
   categoryId: string;
@@ -25,6 +31,7 @@ export interface Artifact {
   imageUrl: string;
   videoUrl: string;
   videoTitle?: string;
+  videos?: ArtifactVideo[];
 }
 
 export interface QuizChoice {

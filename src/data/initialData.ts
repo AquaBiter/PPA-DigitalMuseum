@@ -234,6 +234,18 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE', // Classic 2000s tech commercial or demonstration
     videoTitle: '2000s Mobile Tech & Texting Culture in the Philippines',
+    videos: [
+      {
+        id: 'vid-nokia-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: '2000s Mobile Tech & Texting Culture in the Philippines',
+      },
+      {
+        id: 'vid-nokia-2',
+        url: 'https://www.youtube.com/embed/Q4Xky3t8YmQ',
+        title: 'Nokia 3310 & 3210 Nostalgia Retrospective',
+      },
+    ],
   },
   {
     id: 'friendster-internet-cafe',
@@ -244,6 +256,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: '2000s Internet Cafe & Friendster Phenomenon',
+    videos: [
+      {
+        id: 'vid-friendster-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: '2000s Internet Cafe & Friendster Phenomenon',
+      },
+    ],
   },
   {
     id: 'edsa-dos',
@@ -254,6 +273,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: 'EDSA II SMS Revolution Documentary',
+    videos: [
+      {
+        id: 'vid-edsa-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: 'EDSA II SMS Revolution Documentary',
+      },
+    ],
   },
   {
     id: 'hello-garci-scandal',
@@ -264,6 +290,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: '2005 Political Wiretaps & Media Satire Archive',
+    videos: [
+      {
+        id: 'vid-garci-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: '2005 Political Wiretaps & Media Satire Archive',
+      },
+    ],
   },
   {
     id: 'bpo-boom',
@@ -274,6 +307,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: 'Rise of BPO and 2000s Philippine Commerce',
+    videos: [
+      {
+        id: 'vid-bpo-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: 'Rise of BPO and 2000s Philippine Commerce',
+      },
+    ],
   },
   {
     id: 'opm-bands',
@@ -284,6 +324,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: '2000s OPM Band Era Highlights',
+    videos: [
+      {
+        id: 'vid-opm-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: '2000s OPM Band Era Highlights',
+      },
+    ],
   },
   {
     id: 'anime-fever-tv',
@@ -294,6 +341,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: '2000s Philippine TV Anime Nostalgia',
+    videos: [
+      {
+        id: 'vid-anime-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: '2000s Philippine TV Anime Nostalgia',
+      },
+    ],
   },
   {
     id: 'typhoon-ondoy',
@@ -304,6 +358,13 @@ export const INITIAL_ARTIFACTS: Artifact[] = [
     imageUrl: NOKIA_PHONES_IMG,
     videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
     videoTitle: 'Typhoon Ondoy 2009 Bayanihan Archive',
+    videos: [
+      {
+        id: 'vid-ondoy-1',
+        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+        title: 'Typhoon Ondoy 2009 Bayanihan Archive',
+      },
+    ],
   },
 ];
 
