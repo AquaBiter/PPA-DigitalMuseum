@@ -6,6 +6,7 @@ interface WebsiteIntroProps {
 }
 
 export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
+  const [hasEntered, setHasEntered] = useState<boolean>(false);
   const [isPortrait, setIsPortrait] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return window.innerHeight > window.innerWidth;
@@ -54,8 +55,9 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   const currentList = isPortrait ? portraitCandidates : landscapeCandidates;
   const currentVideoSrc = currentList[candidateIndex] || currentList[0];
 
-  // Play video with sound automatically
+  // Play video with sound immediately once "ENTER NOW!" has been pressed
   useEffect(() => {
+    if (!hasEntered) return;
     const video = videoRef.current;
     if (!video || hasVideoError) return;
 
@@ -64,56 +66,18 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
     video.volume = 1.0;
 
     const playPromise = video.play();
-
     if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          // Playing with sound automatically!
-        })
-        .catch(() => {
-          // If browser temporarily blocks sound before first gesture:
-          // Start video rolling and automatically unmute on the very first mouse move, scroll, or touch
-          video.muted = true;
-          video.play().catch(() => {});
-
-          const autoEnableAudio = () => {
-            if (videoRef.current) {
-              const wasMuted = videoRef.current.muted;
-              videoRef.current.muted = false;
-              videoRef.current.volume = 1.0;
-              // If video was playing muted during the first second, rewind to 0 so full sound is heard
-              if (wasMuted && videoRef.current.currentTime > 0.4 && videoRef.current.currentTime < 2.5) {
-                videoRef.current.currentTime = 0;
-              }
-              videoRef.current.play().catch(() => {});
-            }
-            cleanupListeners();
-          };
-
-          const interactionEvents = [
-            'pointermove',
-            'pointerdown',
-            'mousemove',
-            'mousedown',
-            'touchstart',
-            'keydown',
-            'wheel',
-            'scroll',
-            'focus',
-          ];
-
-          const cleanupListeners = () => {
-            interactionEvents.forEach((evt) => {
-              window.removeEventListener(evt, autoEnableAudio);
-            });
-          };
-
-          interactionEvents.forEach((evt) => {
-            window.addEventListener(evt, autoEnableAudio, { passive: true, once: true });
-          });
-        });
+      playPromise.catch((err) => {
+        console.warn('Initial unmuted play rejected, retrying:', err);
+        video.muted = true;
+        video.play().then(() => {
+          // Immediately unmute once rolling
+          video.muted = false;
+          video.volume = 1.0;
+        }).catch(() => {});
+      });
     }
-  }, [currentVideoSrc, hasVideoError]);
+  }, [hasEntered, currentVideoSrc, hasVideoError]);
 
   const handleVideoError = () => {
     // If current file candidate failed, try next candidate
@@ -125,16 +89,33 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
     }
   };
 
-  const handleScreenClick = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = false;
-      videoRef.current.volume = 1.0;
-      if (videoRef.current.paused) {
-        videoRef.current.play().catch(() => {});
-      }
-    }
+  const handleEnterNow = () => {
+    setHasEntered(true);
   };
 
+  // 1. Landing Screen BEFORE Opening Video: "ENTER NOW!"
+  if (!hasEntered) {
+    return (
+      <div className="fixed inset-0 z-[10000] w-screen h-screen bg-black overflow-hidden flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
+        {/* Subtle ambient background glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.12),transparent_65%)] pointer-events-none" />
+
+        {/* "ENTER NOW!" Text Box Button */}
+        <div className="relative z-10 flex flex-col items-center">
+          <button
+            type="button"
+            onClick={handleEnterNow}
+            className="group relative px-10 sm:px-14 py-4 sm:py-5 rounded-2xl bg-white text-black font-bebas text-3xl sm:text-4xl tracking-wider hover:bg-zinc-100 transition-all cursor-pointer shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_55px_rgba(6,182,212,0.7)] hover:scale-105 active:scale-95 flex items-center gap-3 border-2 border-white"
+          >
+            <span>ENTER NOW!</span>
+            <ArrowRight className="w-7 h-7 group-hover:translate-x-1.5 transition-transform" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Opening Video Playback Screen
   return (
     <div className="fixed inset-0 z-[10000] w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none animate-fadeIn">
       {/* If custom video is present, stretch to screen as requested */}
@@ -155,10 +136,18 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
             className="w-full h-full object-fill absolute inset-0 block pointer-events-none"
           />
 
-          {/* Full-screen transparent overlay captures clicks to unmute and blocks Edge native hover widget */}
+          {/* Full-screen transparent overlay to block Edge/Chrome hover video tools */}
           <div
-            onClick={handleScreenClick}
             className="absolute inset-0 z-20 w-full h-full bg-transparent cursor-pointer"
+            onClick={() => {
+              if (videoRef.current) {
+                videoRef.current.muted = false;
+                videoRef.current.volume = 1.0;
+                if (videoRef.current.paused) {
+                  videoRef.current.play().catch(() => {});
+                }
+              }
+            }}
           />
         </>
       ) : (
