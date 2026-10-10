@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Play } from 'lucide-react';
+import { ArrowRight, VolumeX } from 'lucide-react';
 
 interface WebsiteIntroProps {
   onFinish: () => void;
@@ -14,10 +14,7 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   });
 
   const [hasVideoError, setHasVideoError] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [needsUserTap, setNeedsUserTap] = useState<boolean>(false);
-
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Update orientation if resized before playback starts
@@ -58,36 +55,52 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   const currentList = isPortrait ? portraitCandidates : landscapeCandidates;
   const currentVideoSrc = currentList[candidateIndex] || currentList[0];
 
-  // Try to play video with sound, or muted if browser autoplay blocks sound
+  // Play video with sound immediately
   useEffect(() => {
     const video = videoRef.current;
     if (!video || hasVideoError) return;
 
     video.currentTime = 0;
+    video.muted = false;
+    video.volume = 1.0;
+
     const playPromise = video.play();
 
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
-          setIsPlaying(true);
-          setNeedsUserTap(false);
+          setIsAudioMuted(false);
         })
         .catch(() => {
-          // If browser policy blocks sound autoplay, retry muted
+          // If browser policy blocks sound without user gesture, start muted
           video.muted = true;
-          setIsMuted(true);
-          video
-            .play()
-            .then(() => {
-              setIsPlaying(true);
-              setNeedsUserTap(false);
-            })
-            .catch(() => {
-              // Both blocked without user gesture
-              setNeedsUserTap(true);
-            });
+          setIsAudioMuted(true);
+          video.play().catch(() => {});
         });
     }
+
+    const handleGlobalUnmute = () => {
+      if (videoRef.current) {
+        const wasMuted = videoRef.current.muted;
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1.0;
+        setIsAudioMuted(false);
+        if (wasMuted && videoRef.current.currentTime > 0.5) {
+          videoRef.current.currentTime = 0;
+        }
+        videoRef.current.play().catch(() => {});
+      }
+    };
+
+    window.addEventListener('click', handleGlobalUnmute, { once: true });
+    window.addEventListener('touchstart', handleGlobalUnmute, { once: true });
+    window.addEventListener('keydown', handleGlobalUnmute, { once: true });
+
+    return () => {
+      window.removeEventListener('click', handleGlobalUnmute);
+      window.removeEventListener('touchstart', handleGlobalUnmute);
+      window.removeEventListener('keydown', handleGlobalUnmute);
+    };
   }, [currentVideoSrc, hasVideoError]);
 
   const handleVideoError = () => {
@@ -100,18 +113,19 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
     }
   };
 
-  const handleUserTapToPlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = false;
-    setIsMuted(false);
-    video
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-        setNeedsUserTap(false);
-      })
-      .catch(() => {});
+  const handleScreenClick = () => {
+    if (videoRef.current) {
+      const wasMuted = videoRef.current.muted || isAudioMuted;
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+      setIsAudioMuted(false);
+      if (wasMuted && videoRef.current.currentTime > 0.5) {
+        videoRef.current.currentTime = 0;
+      }
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      }
+    }
   };
 
   return (
@@ -124,29 +138,30 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
             src={currentVideoSrc}
             autoPlay
             playsInline
-            muted={isMuted}
+            disablePictureInPicture
+            disableRemotePlayback
+            controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
             onEnded={onFinish}
             onError={handleVideoError}
             // CSS object-fill stretches the video to the screen if not the same size
-            className="w-full h-full object-fill absolute inset-0 block cursor-pointer"
-            onClick={needsUserTap ? handleUserTapToPlay : undefined}
+            // pointer-events-none completely prevents Edge/Chrome from showing their native PiP & Video Enhance hover widget
+            className="w-full h-full object-fill absolute inset-0 block pointer-events-none"
           />
 
-          {/* Autoplay blocked banner (click anywhere to start with sound) */}
-          {needsUserTap && (
+          {/* Full-screen transparent overlay captures clicks to unmute and blocks Edge native hover widget */}
+          <div
+            onClick={handleScreenClick}
+            className="absolute inset-0 z-20 w-full h-full bg-transparent cursor-pointer"
+          />
+
+          {/* Discreet unmute reminder if browser policy blocked unmuted autoplay */}
+          {isAudioMuted && (
             <div
-              onClick={handleUserTapToPlay}
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center cursor-pointer z-30 animate-fadeIn"
+              onClick={handleScreenClick}
+              className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-black/75 hover:bg-black/90 backdrop-blur-md px-3.5 py-2 rounded-full text-white text-xs font-semibold cursor-pointer border border-white/20 shadow-lg animate-pulse"
             >
-              <div className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center mb-4 shadow-2xl hover:scale-105 transition-transform">
-                <Play className="w-8 h-8 ml-1" />
-              </div>
-              <h2 className="font-bebas text-3xl sm:text-4xl text-white tracking-wider mb-2">
-                Click to Play Opening Intro
-              </h2>
-              <p className="text-zinc-300 text-xs sm:text-sm max-w-sm">
-                Tap anywhere to start the museum intro video with audio
-              </p>
+              <VolumeX className="w-4 h-4 text-amber-400" />
+              <span>Tap anywhere to unmute audio</span>
             </div>
           )}
         </>
