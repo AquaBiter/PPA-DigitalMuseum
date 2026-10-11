@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, ExternalLink, BookOpen } from 'lucide-react';
 import { Category } from '../types';
 
 interface CategoryDetailProps {
@@ -254,6 +254,45 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
           <p className="text-sm sm:text-base md:text-base lg:text-lg xl:text-xl text-zinc-900 leading-relaxed font-normal">
             {category.fullDescription.replace(/^(ex\.|ex)\s*/i, '')}
           </p>
+
+          {/* Source / Reference Links at the bottom of the topic description */}
+          {category.referenceLinks && category.referenceLinks.filter((ref) => ref.url && ref.url.trim() !== '').length > 0 && (
+            <div className="mt-6 pt-5 border-t border-zinc-200/80">
+              <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-600 mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-zinc-700" />
+                <span>
+                  Source / Reference {category.referenceLinks.filter((ref) => ref.url && ref.url.trim() !== '').length > 1 ? 'Links' : 'Link'}
+                </span>
+              </h4>
+              <ul className="space-y-2 list-none p-0 m-0">
+                {category.referenceLinks
+                  .filter((ref) => ref.url && ref.url.trim() !== '')
+                  .map((ref, idx) => {
+                    const cleanUrl = ref.url.trim();
+                    const href = cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')
+                      ? cleanUrl
+                      : `https://${cleanUrl}`;
+                    const label = ref.title && ref.title.trim() !== '' ? ref.title.trim() : cleanUrl;
+
+                    return (
+                      <li key={ref.id || idx} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-600 mt-2 shrink-0" />
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-cyan-800 hover:text-black hover:underline transition-colors break-all group"
+                          title={`Open reference: ${label}`}
+                        >
+                          <span>{label}</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-zinc-400 group-hover:text-black shrink-0 transition-colors" />
+                        </a>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </div>

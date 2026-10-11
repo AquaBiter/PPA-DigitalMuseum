@@ -22,6 +22,7 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
 
   // Extract multiple videos, falling back to legacy videoUrl if needed
   const videoList: ArtifactVideo[] = useMemo(() => {
+    if (artifact.noVideoEmbed) return [];
     if (artifact.videos && artifact.videos.length > 0) {
       const valid = artifact.videos.filter((v) => v.url && v.url.trim() !== '');
       if (valid.length > 0) return valid;
@@ -29,7 +30,7 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
     return artifact.videoUrl && artifact.videoUrl.trim() !== ''
       ? [{ id: 'default', url: artifact.videoUrl, title: artifact.videoTitle || cleanTitle }]
       : [];
-  }, [artifact.videos, artifact.videoUrl, artifact.videoTitle, cleanTitle]);
+  }, [artifact.noVideoEmbed, artifact.videos, artifact.videoUrl, artifact.videoTitle, cleanTitle]);
 
   const [activeVideoIndex, setActiveVideoIndex] = useState<number>(0);
 
@@ -136,38 +137,33 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
               />
             </div>
 
-            {/* Video Section: Direct YouTube embed(s) with multiple video support */}
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <h3 className="text-xl sm:text-2xl font-bold text-zinc-900">
-                  Video Links {videoList.length > 1 ? `(${videoList.length})` : ''}:
-                </h3>
-              </div>
+            {/* Video Section: Direct YouTube embed(s) with multiple video support (omitted if No YT Video Embed is active) */}
+            {!artifact.noVideoEmbed && videoList.length > 0 && embedUrl && (
+              <div>
 
-              {/* Multiple Video Selection Tabs (if artifact has 2 or more videos) */}
-              {videoList.length > 1 && (
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {videoList.map((v, idx) => (
-                    <button
-                      key={v.id || idx}
-                      type="button"
-                      onClick={() => setActiveVideoIndex(idx)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        activeVideoIndex === idx
-                          ? 'bg-black text-white shadow-sm ring-2 ring-black'
-                          : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
-                      }`}
-                    >
-                      <Film className="w-3.5 h-3.5" />
-                      <span>{v.title || `Video ${idx + 1}`}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                {/* Multiple Video Selection Tabs (if artifact has 2 or more videos) */}
+                {videoList.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    {videoList.map((v, idx) => (
+                      <button
+                        key={v.id || idx}
+                        type="button"
+                        onClick={() => setActiveVideoIndex(idx)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          activeVideoIndex === idx
+                            ? 'bg-black text-white shadow-sm ring-2 ring-black'
+                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
+                        }`}
+                      >
+                        <Film className="w-3.5 h-3.5" />
+                        <span>{v.title || `Video ${idx + 1}`}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-              {/* Direct Embedded Video Player Frame */}
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-300 shadow-md bg-black">
-                {embedUrl ? (
+                {/* Direct Embedded Video Player Frame */}
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-300 shadow-md bg-black">
                   <iframe
                     key={embedUrl}
                     src={embedUrl}
@@ -176,21 +172,17 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm">
-                    No video link provided
-                  </div>
+                </div>
+
+                {/* Active Video Title / Description */}
+                {(currentVideo?.title || artifact.videoTitle) && (
+                  <p className="text-xs sm:text-sm text-zinc-600 mt-2 font-semibold flex items-center gap-1.5">
+                    <Play className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                    <span>{currentVideo?.title || artifact.videoTitle}</span>
+                  </p>
                 )}
               </div>
-
-              {/* Active Video Title / Description */}
-              {(currentVideo?.title || artifact.videoTitle) && (
-                <p className="text-xs sm:text-sm text-zinc-600 mt-2 font-semibold flex items-center gap-1.5">
-                  <Play className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                  <span>{currentVideo?.title || artifact.videoTitle}</span>
-                </p>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>

@@ -21,8 +21,19 @@ import {
   EyeOff,
   ListPlus,
   Video,
+  ExternalLink,
+  Link,
 } from 'lucide-react';
-import { Slide, Category, Artifact, ArtifactVideo, QuizQuestion, AboutContent, TimelineMilestone } from '../types';
+import {
+  Slide,
+  Category,
+  CategoryReferenceLink,
+  Artifact,
+  ArtifactVideo,
+  QuizQuestion,
+  AboutContent,
+  TimelineMilestone,
+} from '../types';
 import { formatToYouTubeEmbed, parseMultipleYouTubeUrls, extractYouTubeId } from '../utils/youtube';
 
 interface AdminModalProps {
@@ -68,6 +79,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [previewVideoId, setPreviewVideoId] = useState<string | null>(null);
   const [bulkAddArtifactId, setBulkAddArtifactId] = useState<string | null>(null);
   const [bulkAddText, setBulkAddText] = useState<string>('');
+
+  // States for Topic / Category Reference Links
+  const [bulkAddCatId, setBulkAddCatId] = useState<string | null>(null);
+  const [bulkAddCatText, setBulkAddCatText] = useState<string>('');
 
   // Topic filter for Questions tab to ensure questions are strictly per topic/category
   const [selectedQuestionCategory, setSelectedQuestionCategory] = useState<string>(() => {
@@ -246,9 +261,114 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     showToast('Category removed');
   };
 
-  const handleUpdateCategoryField = (id: string, field: keyof Category, val: string) => {
+  const handleUpdateCategoryField = <K extends keyof Category>(id: string, field: K, val: Category[K]) => {
     onUpdateCategories(
       categories.map((c) => (c.id === id ? { ...c, [field]: val } : c))
+    );
+  };
+
+  const handleAddReferenceLinkToCategory = (catId: string) => {
+    onUpdateCategories(
+      categories.map((c) => {
+        if (c.id !== catId) return c;
+        const currentLinks: CategoryReferenceLink[] = c.referenceLinks ? [...c.referenceLinks] : [];
+        const newLink: CategoryReferenceLink = {
+          id: `ref-${Date.now()}`,
+          url: '',
+          title: '',
+        };
+        return {
+          ...c,
+          referenceLinks: [...currentLinks, newLink],
+        };
+      })
+    );
+    showToast('Added reference link');
+  };
+
+  const handleBulkAddReferenceLinksToCategory = (catId: string, text: string) => {
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      alert('Please enter at least one URL or reference link.');
+      return;
+    }
+    const newLinks: CategoryReferenceLink[] = lines.map((line, idx) => {
+      const parts = line.split('|').map((p) => p.trim());
+      let url = parts[0];
+      let title = parts[1] || '';
+      if (parts.length > 1 && !parts[0].includes('.') && parts[1].includes('.')) {
+        title = parts[0];
+        url = parts[1];
+      }
+      return {
+        id: `ref-${Date.now()}-${idx}`,
+        url,
+        title: title || '',
+      };
+    });
+
+    onUpdateCategories(
+      categories.map((c) => {
+        if (c.id !== catId) return c;
+        const existing = c.referenceLinks ? [...c.referenceLinks] : [];
+        return {
+          ...c,
+          referenceLinks: [...existing, ...newLinks],
+        };
+      })
+    );
+    setBulkAddCatId(null);
+    setBulkAddCatText('');
+    showToast(`Added ${newLinks.length} reference link(s)`);
+  };
+
+  const handleUpdateReferenceLink = (
+    catId: string,
+    linkId: string,
+    field: 'url' | 'title',
+    val: string
+  ) => {
+    onUpdateCategories(
+      categories.map((c) => {
+        if (c.id !== catId) return c;
+        const links = (c.referenceLinks || []).map((l) =>
+          l.id === linkId ? { ...l, [field]: val } : l
+        );
+        return { ...c, referenceLinks: links };
+      })
+    );
+  };
+
+  const handleDeleteReferenceLink = (catId: string, linkId: string) => {
+    onUpdateCategories(
+      categories.map((c) => {
+        if (c.id !== catId) return c;
+        return {
+          ...c,
+          referenceLinks: (c.referenceLinks || []).filter((l) => l.id !== linkId),
+        };
+      })
+    );
+    showToast('Reference link removed');
+  };
+
+  const handleMoveReferenceLink = (catId: string, linkId: string, direction: 'up' | 'down') => {
+    onUpdateCategories(
+      categories.map((c) => {
+        if (c.id !== catId) return c;
+        const links = [...(c.referenceLinks || [])];
+        const idx = links.findIndex((l) => l.id === linkId);
+        if (idx === -1) return c;
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= links.length) return c;
+        const temp = links[idx];
+        links[idx] = links[targetIdx];
+        links[targetIdx] = temp;
+        return { ...c, referenceLinks: links };
+      })
     );
   };
 
@@ -285,7 +405,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     showToast('Artifact removed');
   };
 
-  const handleUpdateArtifactField = (id: string, field: keyof Artifact, val: string) => {
+  const handleUpdateArtifactField = <K extends keyof Artifact>(id: string, field: K, val: Artifact[K]) => {
     onUpdateArtifacts(
       artifacts.map((a) => (a.id === id ? { ...a, [field]: val } : a))
     );
@@ -628,20 +748,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       {/* Dashboard Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-200 gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="font-bebas text-4xl sm:text-5xl text-black font-bold tracking-wide">
-              Archive Management Console
-            </h2>
-            <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-bold">
-              Admin Active
-            </span>
-          </div>
-          <p className="text-sm text-zinc-500 mt-1">
+          <h2 className="font-bebas text-3xl sm:text-4xl md:text-5xl text-black font-bold tracking-wide">
+            Archive Management Console
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1">
             Create, edit, delete, and manage topics, artifacts, and questions per category.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
 
           <button
             onClick={() => {
@@ -750,7 +865,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {artifacts.map((art) => (
               <div
                 key={art.id}
@@ -840,59 +955,82 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Multiple YouTube Video Embed URLs */}
+                  {/* Video Management with No YT Video Embed Option */}
                   <div className="bg-zinc-100 p-3 sm:p-4 rounded-xl border border-zinc-200 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <label className="block text-xs font-bold uppercase text-zinc-800">
-                            YouTube Video Embed URLs
-                          </label>
-                          <span className="text-[10px] font-bold bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded-full">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Option for "No YT Video Embed" */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-lg border border-zinc-300 hover:border-zinc-400 transition-colors shadow-2xs">
+                          <input
+                            type="checkbox"
+                            checked={!!art.noVideoEmbed}
+                            onChange={(e) => handleUpdateArtifactField(art.id, 'noVideoEmbed', e.target.checked)}
+                            className="w-4 h-4 rounded text-black focus:ring-black cursor-pointer accent-black"
+                          />
+                          <span className="text-xs font-bold text-zinc-800">No YT Video Embed</span>
+                        </label>
+
+                        {!art.noVideoEmbed && (
+                          <span className="text-[10px] font-bold bg-zinc-200 text-zinc-700 px-2 py-1 rounded-full">
                             {((art.videos && art.videos.length > 0) ? art.videos.length : (art.videoUrl ? 1 : 0))} video(s)
                           </span>
+                        )}
+                      </div>
+
+                      {!art.noVideoEmbed && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (bulkAddArtifactId === art.id) {
+                                setBulkAddArtifactId(null);
+                              } else {
+                                setBulkAddArtifactId(art.id);
+                                setBulkAddText('');
+                              }
+                            }}
+                            className="flex items-center gap-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                            title="Paste and import multiple URLs at once"
+                          >
+                            <ListPlus className="w-3.5 h-3.5 text-zinc-700" />
+                            <span>{bulkAddArtifactId === art.id ? 'Close Bulk Add' : 'Bulk Add Multiple URLs'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddVideoToArtifact(art.id)}
+                            className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Video Link</span>
+                          </button>
                         </div>
-                        <p className="text-[11px] text-zinc-500">
-                          Add multiple YouTube links (embed, watch, youtu.be, or shorts). They auto-format to embed links.
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (bulkAddArtifactId === art.id) {
-                              setBulkAddArtifactId(null);
-                            } else {
-                              setBulkAddArtifactId(art.id);
-                              setBulkAddText('');
-                            }
-                          }}
-                          className="flex items-center gap-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs"
-                          title="Paste and import multiple YouTube URLs at once"
-                        >
-                          <ListPlus className="w-3.5 h-3.5 text-zinc-700" />
-                          <span>{bulkAddArtifactId === art.id ? 'Close Bulk Add' : 'Bulk Add Multiple URLs'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleAddVideoToArtifact(art.id)}
-                          className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Add Video Link</span>
-                        </button>
-                      </div>
+                      )}
                     </div>
 
+                    {/* Notice if No YT Video Embed is toggled on */}
+                    {art.noVideoEmbed && (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          <strong>No YT Video Embed is active:</strong> The video player will not be displayed on this artifact's page.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateArtifactField(art.id, 'noVideoEmbed', false)}
+                          className="font-bold underline text-black hover:text-cyan-800 cursor-pointer"
+                        >
+                          Enable Video Embed
+                        </button>
+                      </div>
+                    )}
+
                     {/* Bulk Add Multiple URLs Collapsible Box */}
-                    {bulkAddArtifactId === art.id && (
+                    {!art.noVideoEmbed && bulkAddArtifactId === art.id && (
                       <div className="bg-white p-3.5 rounded-xl border-2 border-dashed border-zinc-300 space-y-2.5 animate-fadeIn">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
                             <Video className="w-4 h-4 text-cyan-600" />
-                            Paste Multiple YouTube Video URLs
+                            Paste Multiple Video URLs
                           </span>
                           <span className="text-[10px] text-zinc-400">
                             1 link per line, or comma-separated
@@ -902,7 +1040,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           value={bulkAddText}
                           onChange={(e) => setBulkAddText(e.target.value)}
                           rows={3}
-                          placeholder={`Paste multiple YouTube URLs here, e.g.:\nhttps://www.youtube.com/watch?v=rP1Zc5oJ8aE\nhttps://youtu.be/Q4Xky3t8YmQ | Vintage Nokia Retrospective\nhttps://www.youtube.com/embed/dQw4w9WgXcQ`}
+                          placeholder={`Paste multiple URLs here, e.g.:\nhttps://www.youtube.com/watch?v=rP1Zc5oJ8aE\nhttps://youtu.be/Q4Xky3t8YmQ | Vintage Nokia Retrospective\nhttps://www.youtube.com/embed/dQw4w9WgXcQ`}
                           className="w-full text-xs font-mono p-2.5 rounded-lg border border-zinc-300 bg-zinc-50 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-black"
                         />
                         <div className="flex items-center justify-end gap-2">
@@ -928,127 +1066,129 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     )}
 
                     {/* List of video links */}
-                    <div className="space-y-3">
-                      {((art.videos && art.videos.length > 0)
-                        ? art.videos
-                        : [{ id: `vid-${art.id}`, url: art.videoUrl || '', title: art.videoTitle || 'Main Archival Video' }]
-                      ).map((vid, vIdx, arr) => {
-                        const ytId = extractYouTubeId(vid.url);
-                        const isPreviewing = previewVideoId === vid.id;
+                    {!art.noVideoEmbed && (
+                      <div className="space-y-3">
+                        {((art.videos && art.videos.length > 0)
+                          ? art.videos
+                          : [{ id: `vid-${art.id}`, url: art.videoUrl || '', title: art.videoTitle || 'Main Archival Video' }]
+                        ).map((vid, vIdx, arr) => {
+                          const ytId = extractYouTubeId(vid.url);
+                          const isPreviewing = previewVideoId === vid.id;
 
-                        return (
-                          <div key={vid.id || vIdx} className="bg-white p-3 rounded-lg border border-zinc-300 space-y-2.5 shadow-2xs">
-                            <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-1.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-bold text-zinc-700 uppercase flex items-center gap-1">
-                                  <Film className="w-3.5 h-3.5 text-zinc-500" />
-                                  Video #{vIdx + 1} {vIdx === 0 && <span className="text-[9px] text-cyan-700 bg-cyan-50 px-1.5 py-0.2 rounded font-bold uppercase">(Primary)</span>}
-                                </span>
-                                {ytId && (
-                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium">
-                                    ✓ ID: {ytId}
+                          return (
+                            <div key={vid.id || vIdx} className="bg-white p-3 sm:p-3.5 rounded-lg border border-zinc-300 space-y-2.5 shadow-2xs">
+                              {/* Video item header: strictly aligned and resilient in Portrait & Landscape */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-2">
+                                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                  <span className="text-[11px] font-bold text-zinc-700 uppercase flex items-center gap-1 shrink-0">
+                                    <Film className="w-3.5 h-3.5 text-zinc-500" />
+                                    Video #{vIdx + 1}
+                                    {vIdx === 0 && (
+                                      <span className="text-[9px] text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded font-bold uppercase">
+                                        (Primary)
+                                      </span>
+                                    )}
                                   </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1">
-                                {vid.url && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewVideoId(isPreviewing ? null : vid.id)}
-                                    className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                                      isPreviewing
-                                        ? 'bg-black text-white'
-                                        : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
-                                    }`}
-                                    title="Toggle preview video"
-                                  >
-                                    {isPreviewing ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                    <span>{isPreviewing ? 'Hide' : 'Preview'}</span>
-                                  </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoveArtifactVideo(art.id, vIdx, 'up')}
-                                  disabled={vIdx === 0}
-                                  className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                                  title="Move Up"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoveArtifactVideo(art.id, vIdx, 'down')}
-                                  disabled={vIdx === arr.length - 1}
-                                  className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                                  title="Move Down"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" />
-                                </button>
-
-                                {arr.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteArtifactVideo(art.id, vid.id)}
-                                    className="p-1 text-red-500 hover:text-red-700 cursor-pointer ml-0.5"
-                                    title="Delete this video"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                              <div className="sm:col-span-1">
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">
-                                  Video Title / Label
-                                </label>
-                                <input
-                                  type="text"
-                                  value={vid.title || ''}
-                                  onChange={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'title', e.target.value)}
-                                  placeholder="e.g. TV Commercial Clip"
-                                  className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-medium focus:ring-1 focus:ring-black"
-                                />
-                              </div>
-                              <div className="sm:col-span-2">
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5 flex items-center justify-between">
-                                  <span>YouTube URL (watch?v=, youtu.be, /embed/, or shorts)</span>
-                                  {vid.url && !ytId && (
-                                    <span className="text-amber-600 font-normal">Check link format</span>
+                                  {ytId && (
+                                    <span
+                                      className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium truncate max-w-[130px]"
+                                      title={`YouTube ID: ${ytId}`}
+                                    >
+                                      ✓ {ytId}
+                                    </span>
                                   )}
-                                </label>
-                                <input
-                                  type="text"
-                                  value={vid.url}
-                                  onChange={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'url', e.target.value)}
-                                  onBlur={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'url', formatToYouTubeEmbed(e.target.value))}
-                                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
-                                  className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-mono focus:ring-1 focus:ring-black"
-                                />
-                              </div>
-                            </div>
+                                </div>
 
-                            {/* Live Video Preview Box in Admin */}
-                            {isPreviewing && vid.url && (
-                              <div className="pt-2 border-t border-zinc-100">
-                                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black shadow-inner">
-                                  <iframe
-                                    src={formatToYouTubeEmbed(vid.url)}
-                                    title={vid.title || 'YouTube preview'}
-                                    className="w-full h-full border-0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
+                                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                                  {vid.url && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewVideoId(isPreviewing ? null : vid.id)}
+                                      className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer shrink-0 shadow-2xs ${
+                                        isPreviewing
+                                          ? 'bg-black text-white ring-1 ring-black'
+                                          : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200'
+                                      }`}
+                                      title="Toggle preview video"
+                                    >
+                                      {isPreviewing ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                      <span>{isPreviewing ? 'Hide' : 'Preview'}</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveArtifactVideo(art.id, vIdx, 'up')}
+                                    disabled={vIdx === 0}
+                                    className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded hover:bg-zinc-100 shrink-0"
+                                    title="Move Up"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveArtifactVideo(art.id, vIdx, 'down')}
+                                    disabled={vIdx === arr.length - 1}
+                                    className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer rounded hover:bg-zinc-100 shrink-0"
+                                    title="Move Down"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {arr.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteArtifactVideo(art.id, vid.id)}
+                                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded cursor-pointer shrink-0 ml-0.5"
+                                      title="Delete this video"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div className="sm:col-span-1">
+                                  <input
+                                    type="text"
+                                    value={vid.title || ''}
+                                    onChange={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'title', e.target.value)}
+                                    placeholder="Title (optional, e.g. Clip)"
+                                    className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-medium focus:ring-1 focus:ring-black placeholder:text-zinc-400"
+                                  />
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <input
+                                    type="text"
+                                    value={vid.url}
+                                    onChange={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'url', e.target.value)}
+                                    onBlur={(e) => handleUpdateArtifactVideo(art.id, vid.id, 'url', formatToYouTubeEmbed(e.target.value))}
+                                    placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                                    className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-mono focus:ring-1 focus:ring-black placeholder:text-zinc-400"
                                   />
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+
+                              {/* Live Video Preview Box in Admin */}
+                              {isPreviewing && vid.url && (
+                                <div className="pt-2 border-t border-zinc-100">
+                                  <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black shadow-inner">
+                                    <iframe
+                                      src={formatToYouTubeEmbed(vid.url)}
+                                      title={vid.title || 'Video preview'}
+                                      className="w-full h-full border-0"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1134,7 +1274,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {questionsInActiveCategory.map((q) => (
                 <div
                   key={q.id}
@@ -1299,7 +1439,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {categories.map((cat) => (
               <div
                 key={cat.id}
@@ -1345,6 +1485,185 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       rows={4}
                       className="w-full text-xs p-2 rounded border border-zinc-300 bg-white text-zinc-800 font-normal leading-relaxed"
                     />
+                  </div>
+
+                  {/* Topic Source / Reference Links (Option to add 1 or multiple source/reference links) */}
+                  <div className="bg-white p-3.5 rounded-xl border border-zinc-200 space-y-3 shadow-2xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-xs font-bold uppercase text-zinc-800 flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-cyan-600" />
+                            Source / Reference Links
+                          </label>
+                          <span className="text-[10px] font-bold bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded-full">
+                            {(cat.referenceLinks || []).length} link(s)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500">
+                          Add 1 or multiple sources / references. These links will appear at the bottom of this topic&apos;s description.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (bulkAddCatId === cat.id) {
+                              setBulkAddCatId(null);
+                            } else {
+                              setBulkAddCatId(cat.id);
+                              setBulkAddCatText('');
+                            }
+                          }}
+                          className="flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors border border-zinc-200"
+                          title="Paste and import multiple reference links"
+                        >
+                          <ListPlus className="w-3.5 h-3.5 text-zinc-700" />
+                          <span>{bulkAddCatId === cat.id ? 'Close Bulk' : 'Bulk Add Links'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddReferenceLinkToCategory(cat.id)}
+                          className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Link</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bulk Add Links Collapsible */}
+                    {bulkAddCatId === cat.id && (
+                      <div className="bg-zinc-50 p-3 rounded-xl border-2 border-dashed border-zinc-300 space-y-2 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+                            <Link className="w-3.5 h-3.5 text-cyan-600" />
+                            Paste Multiple Reference Links
+                          </span>
+                          <span className="text-[10px] text-zinc-500">
+                            1 link per line, or URL | Title
+                          </span>
+                        </div>
+                        <textarea
+                          value={bulkAddCatText}
+                          onChange={(e) => setBulkAddCatText(e.target.value)}
+                          rows={3}
+                          placeholder={`Paste reference links here, e.g.:\nhttps://en.wikipedia.org/wiki/EDSA_II | EDSA II Chronology\nhttps://nhcp.gov.ph | National Historical Commission\nhttps://psa.gov.ph`}
+                          className="w-full text-xs font-mono p-2.5 rounded-lg border border-zinc-300 bg-white text-zinc-800 focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBulkAddCatId(null);
+                              setBulkAddCatText('');
+                            }}
+                            className="text-xs font-semibold px-3 py-1.5 text-zinc-600 hover:text-black cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBulkAddReferenceLinksToCategory(cat.id, bulkAddCatText)}
+                            className="bg-black text-white hover:bg-zinc-800 text-xs font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                          >
+                            Import &amp; Add Links
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* List of reference links */}
+                    {(!cat.referenceLinks || cat.referenceLinks.length === 0) ? (
+                      <div className="p-3 bg-zinc-50 rounded-lg border border-dashed border-zinc-300 text-center text-xs text-zinc-500">
+                        No reference links added yet. Click &ldquo;Add Link&rdquo; to add 1 or multiple sources.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {cat.referenceLinks.map((ref, rIdx, rArr) => (
+                          <div
+                            key={ref.id || rIdx}
+                            className="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 space-y-2 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 border-b border-zinc-200/60 pb-1">
+                              <span className="text-[11px] font-bold text-zinc-700 uppercase flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-600" />
+                                Source Link #{rIdx + 1}
+                              </span>
+
+                              <div className="flex items-center gap-1">
+                                {ref.url && (
+                                  <a
+                                    href={ref.url.startsWith('http') ? ref.url : `https://${ref.url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 text-zinc-500 hover:text-black rounded hover:bg-zinc-200 cursor-pointer"
+                                    title="Open link in new tab"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveReferenceLink(cat.id, ref.id, 'up')}
+                                  disabled={rIdx === 0}
+                                  className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveReferenceLink(cat.id, ref.id, 'down')}
+                                  disabled={rIdx === rArr.length - 1}
+                                  className="p-1 text-zinc-500 hover:text-black disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteReferenceLink(cat.id, ref.id)}
+                                  className="p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-50 cursor-pointer ml-0.5"
+                                  title="Delete Link"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">
+                                  Title / Label (Optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={ref.title || ''}
+                                  onChange={(e) => handleUpdateReferenceLink(cat.id, ref.id, 'title', e.target.value)}
+                                  placeholder="e.g. Inquirer Digital Archives"
+                                  className="w-full text-xs p-1.5 rounded border border-zinc-300 bg-white text-zinc-800"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">
+                                  URL / Web Address
+                                </label>
+                                <input
+                                  type="text"
+                                  value={ref.url}
+                                  onChange={(e) => handleUpdateReferenceLink(cat.id, ref.id, 'url', e.target.value)}
+                                  placeholder="https://..."
+                                  className="w-full text-xs p-1.5 rounded border border-zinc-300 bg-white text-zinc-800 font-mono"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1420,7 +1739,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {slides.map((slide, idx) => (
               <div
                 key={slide.id}

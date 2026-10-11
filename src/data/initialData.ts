@@ -38,6 +38,18 @@ export const INITIAL_CATEGORIES: Category[] = [
     summary: 'Discover the political events, leaders, movements, and information that shaped the 2000s.',
     fullDescription: 'This archive explores the dynamic political landscape of the Philippines from 2000 to 2010. It chronicles key leadership transitions such as EDSA Dos (2001), state policies, national elections, civil resistance movements, and the emerging role of mobile texting and early cyberactivism in political mobilization.',
     accentColor: '#EF4444',
+    referenceLinks: [
+      {
+        id: 'ref-pol-1',
+        url: 'https://en.wikipedia.org/wiki/EDSA_II',
+        title: 'EDSA People Power II Archive & Chronology',
+      },
+      {
+        id: 'ref-pol-2',
+        url: 'https://nhcp.gov.ph',
+        title: 'National Historical Commission of the Philippines (NHCP)',
+      },
+    ],
   },
   {
     id: 'economic',
@@ -45,6 +57,18 @@ export const INITIAL_CATEGORIES: Category[] = [
     summary: 'Discover how Filipinos worked, spent, paid, and shopped during the 2000s.',
     fullDescription: 'This archive explores economic life and consumer culture in the Philippines from 2000 to 2010. From the mushrooming of modern shopping mega-malls, the rise of the Business Process Outsourcing (BPO) call center industry, to everyday street vending, prepaid phone cards, and changing remittance lifelines of Overseas Filipino Workers (OFWs).',
     accentColor: '#10B981',
+    referenceLinks: [
+      {
+        id: 'ref-econ-1',
+        url: 'https://www.bsp.gov.ph',
+        title: 'Bangko Sentral ng Pilipinas - Historical Economic Statistics (2000-2010)',
+      },
+      {
+        id: 'ref-econ-2',
+        url: 'https://psa.gov.ph',
+        title: 'Philippine Statistics Authority - OFW & Consumer Surveys',
+      },
+    ],
   },
   {
     id: 'social',
@@ -52,6 +76,18 @@ export const INITIAL_CATEGORIES: Category[] = [
     summary: 'Explore how Filipinos communicated, connected, and spent time together during the 2000s.',
     fullDescription: 'This archive explores the everyday social life of Filipinos from 2000 to 2010, including communication, friendships, family connections, gadgets, social spaces, and early online communities. It shows how technologies such as mobile phones, texting, and the Internet changed how people interacted with each other.',
     accentColor: '#06B6D4',
+    referenceLinks: [
+      {
+        id: 'ref-soc-1',
+        url: 'https://en.wikipedia.org/wiki/Nokia_3310',
+        title: 'Nokia 3310 & Philippine SMS Culture in the 2000s',
+      },
+      {
+        id: 'ref-soc-2',
+        url: 'https://www.inquirer.net',
+        title: 'Philippine Daily Inquirer Digital Archives (2000-2010 Life & Trends)',
+      },
+    ],
   },
   {
     id: 'cultural',
@@ -59,6 +95,18 @@ export const INITIAL_CATEGORIES: Category[] = [
     summary: 'Explore the music, television, fashion, food, technology, and trends that shaped Philippine popular culture.',
     fullDescription: 'This archive celebrates the golden era of 2000s Pinoy pop culture: the golden boom of Original Pilipino Music (OPM) alternative rock bands, iconic primetime fantaseryes and reality television, cyber cafes (kompyuteran), dance crazes, and early Filipino internet subcultures.',
     accentColor: '#F59E0B',
+    referenceLinks: [
+      {
+        id: 'ref-cult-1',
+        url: 'https://opm.org.ph',
+        title: 'Organisasyon ng mga Pilipinong Mang-aawit (OPM) History & Boom',
+      },
+      {
+        id: 'ref-cult-2',
+        url: 'https://filipiknow.net',
+        title: 'Retro Pinoy Pop Culture & 2000s Nostalgia Archives',
+      },
+    ],
   },
   {
     id: 'environmental',
@@ -66,6 +114,18 @@ export const INITIAL_CATEGORIES: Category[] = [
     summary: 'Discover environmental issues, practices, and experiences that were part of Filipino life.',
     fullDescription: 'This archive examines environmental conditions, natural disasters, ecological shifts, and communal resilience in the Philippines during the 2000s, including historical weather occurrences like Typhoon Ondoy (2009), early solid waste management campaigns, and grassroots community adaptations.',
     accentColor: '#84CC16',
+    referenceLinks: [
+      {
+        id: 'ref-env-1',
+        url: 'https://bagong.pagasa.dost.gov.ph',
+        title: 'DOST-PAGASA Historical Weather & Tropical Cyclone Records',
+      },
+      {
+        id: 'ref-env-2',
+        url: 'https://denr.gov.ph',
+        title: 'Department of Environment and Natural Resources (DENR) Archive',
+      },
+    ],
   },
 ];
 

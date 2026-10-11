@@ -1,81 +1,147 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, Tablet, RotateCw } from 'lucide-react';
 
+/**
+ * Determines whether the current device is a mobile phone or tablet in landscape mode.
+ * When in landscape, tablets and mobile phones are locked and the website is made unviewable.
+ */
+const computeRestriction = (): 'phone-landscape' | 'tablet-landscape' | null => {
+  if (typeof window === 'undefined') return null;
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const isLandscape = width > height;
+
+  // Portrait orientation is always allowed
+  if (!isLandscape) {
+    return null;
+  }
+
+  const minDimension = Math.min(width, height);
+  const maxDimension = Math.max(width, height);
+  const aspectRatio = width / Math.max(height, 1);
+
+  const ua = navigator.userAgent.toLowerCase();
+  const platform = (navigator.platform || '').toLowerCase();
+
+  // 1. Touch detection
+  const hasTouch =
+    Boolean(
+      (typeof navigator !== 'undefined' &&
+        (navigator.maxTouchPoints > 0 || 'ontouchstart' in window)) ||
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      (window.matchMedia && window.matchMedia('(any-pointer: coarse)').matches)
+    );
+
+  // 2. iPad Detection (Safari, Chrome on iPadOS, WebViews, and touchscreen Macs)
+  const isIPad =
+    /ipad/i.test(ua) ||
+    (platform === 'macintel' && hasTouch) ||
+    (/(macintosh|mac os x)/i.test(ua) && hasTouch && !/iphone|ipod/i.test(ua));
+
+  // 3. Android Tablet Detection (Android devices with large viewports or without "mobile" token)
+  const isAndroidTablet =
+    /android/i.test(ua) &&
+    (!/mobile/i.test(ua) || minDimension >= 550 || maxDimension >= 960);
+
+  // 4. Windows Tablet / Surface / 2-in-1 Tablet Detection
+  const isWindowsTablet =
+    /windows nt/i.test(ua) &&
+    hasTouch &&
+    minDimension <= 1200 &&
+    maxDimension <= 1650;
+
+  // 5. Explicit Tablet / E-Reader identifiers
+  const isExplicitTabletUA =
+    isIPad ||
+    isAndroidTablet ||
+    isWindowsTablet ||
+    /tablet|playbook|silk|kindle|kfrwi|sm-t|gt-p|lenovo.*tab|pixel.*tablet/i.test(ua);
+
+  // 6. Viewport Heuristics for Tablets:
+  // Typical tablet viewport in landscape: minDimension (height) 480px-1150px,
+  // maxDimension (width) 768px-1450px, and boxy aspect ratio (<= 1.72: 4:3 is 1.33, 3:2 is 1.5, 16:10 is 1.6).
+  const isTabletDimensions =
+    minDimension >= 480 &&
+    minDimension <= 1150 &&
+    maxDimension >= 768 &&
+    maxDimension <= 1450 &&
+    aspectRatio <= 1.72;
+
+  // A device is classified as a Tablet if:
+  // - It has an explicit tablet UA, OR
+  // - It is a touch device with tablet dimensions (all physical iPads, Galaxy Tabs, Surface), OR
+  // - It matches standard tablet dimensions & aspect ratio (DevTools iPad/tablet emulators and preview modes)
+  const isTablet =
+    isExplicitTabletUA ||
+    (hasTouch && minDimension >= 500 && minDimension <= 1200 && maxDimension <= 1650) ||
+    isTabletDimensions;
+
+  // 7. Mobile Phone Detection:
+  const isMobilePhone =
+    !isTablet &&
+    (minDimension < 520 ||
+      /mobile|iphone|ipod|android.*mobile/i.test(ua) ||
+      (hasTouch && minDimension < 600));
+
+  // In Landscape mode:
+  if (isMobilePhone) {
+    return 'phone-landscape';
+  }
+
+  if (isTablet) {
+    return 'tablet-landscape';
+  }
+
+  return null;
+};
+
 export const DeviceOrientationGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [restriction, setRestriction] = useState<'phone-landscape' | 'tablet-landscape' | null>(null);
+  // Synchronous initialization prevents flash of unrestricted content on mount
+  const [restriction, setRestriction] = useState<'phone-landscape' | 'tablet-landscape' | null>(
+    computeRestriction
+  );
 
   useEffect(() => {
     const checkOrientation = () => {
-      if (typeof window === 'undefined') return;
-
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      const minDimension = Math.min(width, height);
-      const maxDimension = Math.max(width, height);
-      const isLandscape = width > height;
-
-      // Touch capability & user agent detection
-      const ua = navigator.userAgent.toLowerCase();
-      const hasTouch =
-        (typeof navigator !== 'undefined' &&
-          (navigator.maxTouchPoints > 0 || 'ontouchstart' in window)) ||
-        Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-
-      const isIPad =
-        /ipad/i.test(ua) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-      const isTabletUA =
-        isIPad ||
-        /tablet|playbook|silk/i.test(ua) ||
-        (/android/i.test(ua) && !/mobile/i.test(ua));
-
-      // Tablet Detection heuristics:
-      // Matches iPad/Tablet UA, OR touch device with typical tablet viewport (minDimension between 600px and 1100px and maxDimension <= 1400px)
-      const isTablet =
-        isTabletUA ||
-        (hasTouch &&
-          minDimension >= 600 &&
-          minDimension <= 1100 &&
-          maxDimension <= 1400 &&
-          !/windows nt/i.test(ua));
-
-      // Mobile Phone Detection:
-      const isMobilePhone =
-        !isTablet &&
-        ((!isTabletUA && minDimension < 600) ||
-          (/mobile|iphone|ipod|android.*mobile/i.test(ua) && minDimension < 650));
-
-      // Restrictions as requested:
-      // 1. Mobile Phones: ONLY allowed in Portrait mode (restricted in Landscape)
-      if (isMobilePhone && isLandscape) {
-        setRestriction('phone-landscape');
-        return;
-      }
-
-      // 2. Tablets: ONLY allowed in Portrait mode (restricted in Landscape, exactly like Mobile Mode)
-      if (isTablet && isLandscape) {
-        setRestriction('tablet-landscape');
-        return;
-      }
-
-      // 3. Desktop / Portrait orientation: Unrestricted
-      setRestriction(null);
+      setRestriction(computeRestriction());
     };
 
     checkOrientation();
+
+    // Prevent body scrolling when locked
+    if (restriction) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
     window.addEventListener('resize', checkOrientation);
     window.addEventListener('orientationchange', checkOrientation);
 
-    const mql = window.matchMedia('(orientation: portrait)');
-    mql.addEventListener?.('change', checkOrientation);
+    // Screen orientation API support
+    const screenOrientation = window.screen?.orientation;
+    if (screenOrientation && screenOrientation.addEventListener) {
+      screenOrientation.addEventListener('change', checkOrientation);
+    }
+
+    const mqlPortrait = window.matchMedia('(orientation: portrait)');
+    mqlPortrait.addEventListener?.('change', checkOrientation);
+
+    const mqlLandscape = window.matchMedia('(orientation: landscape)');
+    mqlLandscape.addEventListener?.('change', checkOrientation);
 
     return () => {
+      document.body.style.overflow = '';
       window.removeEventListener('resize', checkOrientation);
       window.removeEventListener('orientationchange', checkOrientation);
-      mql.removeEventListener?.('change', checkOrientation);
+      if (screenOrientation && screenOrientation.removeEventListener) {
+        screenOrientation.removeEventListener('change', checkOrientation);
+      }
+      mqlPortrait.removeEventListener?.('change', checkOrientation);
+      mqlLandscape.removeEventListener?.('change', checkOrientation);
     };
-  }, []);
+  }, [restriction]);
 
   if (restriction) {
     const isTabletMode = restriction === 'tablet-landscape';
@@ -86,7 +152,7 @@ export const DeviceOrientationGuard: React.FC<{ children: React.ReactNode }> = (
     return (
       <div className="fixed inset-0 z-[9999] bg-[#0c0c0e] text-white flex items-center justify-center p-3 sm:p-6 text-center select-none overflow-hidden">
         {/* Landscape-optimized container: Horizontal flow fits short viewport heights perfectly */}
-        <div className="max-w-xl w-full flex flex-row items-center justify-center gap-5 sm:gap-8 px-4 py-3 sm:px-6 sm:py-5 bg-zinc-950/80 border border-white/10 rounded-3xl shadow-2xl backdrop-blur-xl">
+        <div className="max-w-xl w-full flex flex-row items-center justify-center gap-5 sm:gap-8 px-4 py-3 sm:px-6 sm:py-5 bg-zinc-950/80 border border-white/10 rounded-3xl shadow-2xl backdrop-blur-xl animate-fadeIn">
           {/* Animated Rotating Device Graphic */}
           <div className="relative shrink-0 flex items-center justify-center">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-zinc-900 border border-zinc-700/80 flex items-center justify-center shadow-xl relative">

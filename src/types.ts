@@ -7,6 +7,12 @@ export interface Slide {
   color?: string; // e.g. '#EAB308', '#06B6D4', '#EF4444'
 }
 
+export interface CategoryReferenceLink {
+  id: string;
+  url: string;
+  title?: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -14,6 +20,7 @@ export interface Category {
   fullDescription: string;
   accentColor?: string;
   bannerImageUrl?: string;
+  referenceLinks?: CategoryReferenceLink[];
 }
 
 export interface ArtifactVideo {
@@ -32,6 +39,7 @@ export interface Artifact {
   videoUrl: string;
   videoTitle?: string;
   videos?: ArtifactVideo[];
+  noVideoEmbed?: boolean;
 }
 
 export interface QuizChoice {

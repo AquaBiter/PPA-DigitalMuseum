@@ -31,11 +31,18 @@ import { formatToYouTubeEmbed } from './utils/youtube';
 
 // Helper to sanitize any legacy "ex." prefix from persisted localStorage data
 const sanitizeCategories = (cats: Category[]): Category[] =>
-  cats.map((c) => ({
-    ...c,
-    name: c.name.replace(/^(ex\.|ex)\s*/i, ''),
-    fullDescription: c.fullDescription.replace(/^(ex\.|ex)\s*/i, ''),
-  }));
+  cats.map((c) => {
+    const initialMatch = INITIAL_CATEGORIES.find((ic) => ic.id === c.id);
+    const referenceLinks = Array.isArray(c.referenceLinks)
+      ? c.referenceLinks
+      : (initialMatch?.referenceLinks || []);
+    return {
+      ...c,
+      name: c.name.replace(/^(ex\.|ex)\s*/i, ''),
+      fullDescription: c.fullDescription.replace(/^(ex\.|ex)\s*/i, ''),
+      referenceLinks,
+    };
+  });
 
 const sanitizeArtifacts = (arts: Artifact[]): Artifact[] =>
   arts.map((a) => {
@@ -67,6 +74,7 @@ const sanitizeArtifacts = (arts: Artifact[]): Artifact[] =>
       videos,
       videoUrl: videos[0]?.url || a.videoUrl || '',
       videoTitle: videos[0]?.title || a.videoTitle || '',
+      noVideoEmbed: a.noVideoEmbed === true,
     };
   });
 
