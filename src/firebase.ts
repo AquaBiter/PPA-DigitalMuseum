@@ -8,7 +8,9 @@ import {
   getDocs,
   setDoc,
   deleteDoc,
+  onSnapshot,
   writeBatch,
+  Unsubscribe,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { Slide, Category, Artifact, QuizQuestion, AboutContent } from './types';
@@ -76,6 +78,27 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+/**
+ * Strips undefined properties recursively so Firestore does not reject writes.
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (Array.isArray(value)) {
+        clean[key] = value.map((item) =>
+          typeof item === 'object' && item !== null ? cleanFirestoreData(item) : item
+        );
+      } else if (typeof value === 'object' && value !== null) {
+        clean[key] = cleanFirestoreData(value);
+      } else {
+        clean[key] = value;
+      }
+    }
+  }
+  return clean;
+}
+
 // Validate connection to Firestore as required by skill
 export async function testConnection(): Promise<boolean> {
   try {
@@ -86,66 +109,169 @@ export async function testConnection(): Promise<boolean> {
       console.warn('Firebase client is offline or connecting...');
       return false;
     }
-    // Any successful network response (even doc not found) confirms Firestore reachable
     return true;
   }
 }
 
-// Firestore Sync Services for Museum Data
-export async function fetchArchiveFromFirestore(): Promise<{
-  slides: Slide[] | null;
-  categories: Category[] | null;
-  artifacts: Artifact[] | null;
-  questions: QuizQuestion[] | null;
-  aboutContent: AboutContent | null;
-}> {
-  try {
-    const slidesSnap = await getDocs(collection(db, 'slides'));
-    const categoriesSnap = await getDocs(collection(db, 'categories'));
-    const artifactsSnap = await getDocs(collection(db, 'artifacts'));
-    const questionsSnap = await getDocs(collection(db, 'questions'));
-    const aboutSnap = await getDocs(collection(db, 'config'));
+export interface ArchiveSubscribeCallbacks {
+  onSlides?: (slides: Slide[]) => void;
+  onCategories?: (categories: Category[]) => void;
+  onArtifacts?: (artifacts: Artifact[]) => void;
+  onQuestions?: (questions: QuizQuestion[]) => void;
+  onAbout?: (about: AboutContent) => void;
+  onError?: (error: unknown) => void;
+}
 
-    const slides: Slide[] = [];
-    slidesSnap.forEach((d) => slides.push(d.data() as Slide));
+/**
+ * Sets up live real-time listeners across all devices.
+ * Whenever an admin adds, edits, or deletes an item in the Cloud, all visitor devices update in real-time.
+ */
+export function subscribeToArchive(callbacks: ArchiveSubscribeCallbacks): () => void {
+  const unsubs: Unsubscribe[] = [];
 
-    const categories: Category[] = [];
-    categoriesSnap.forEach((d) => categories.push(d.data() as Category));
-
-    const artifacts: Artifact[] = [];
-    artifactsSnap.forEach((d) => artifacts.push(d.data() as Artifact));
-
-    const questions: QuizQuestion[] = [];
-    questionsSnap.forEach((d) => questions.push(d.data() as QuizQuestion));
-
-    let aboutContent: AboutContent | null = null;
-    aboutSnap.forEach((d) => {
-      if (d.id === 'about') {
-        aboutContent = d.data() as AboutContent;
+  // 1. Slides real-time subscription
+  if (callbacks.onSlides) {
+    const unsubSlides = onSnapshot(
+      collection(db, 'slides'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Slide[] = [];
+          snapshot.forEach((d) => list.push(d.data() as Slide));
+          callbacks.onSlides?.(list);
+        }
+      },
+      (error) => {
+        callbacks.onError?.(error);
+        try {
+          handleFirestoreError(error, OperationType.GET, 'slides');
+        } catch {}
       }
-    });
+    );
+    unsubs.push(unsubSlides);
+  }
 
-    return {
-      slides: slides.length > 0 ? slides : null,
-      categories: categories.length > 0 ? categories : null,
-      artifacts: artifacts.length > 0 ? artifacts : null,
-      questions: questions.length > 0 ? questions : null,
-      aboutContent,
-    };
+  // 2. Categories real-time subscription
+  if (callbacks.onCategories) {
+    const unsubCategories = onSnapshot(
+      collection(db, 'categories'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Category[] = [];
+          snapshot.forEach((d) => list.push(d.data() as Category));
+          callbacks.onCategories?.(list);
+        }
+      },
+      (error) => {
+        callbacks.onError?.(error);
+        try {
+          handleFirestoreError(error, OperationType.GET, 'categories');
+        } catch {}
+      }
+    );
+    unsubs.push(unsubCategories);
+  }
+
+  // 3. Artifacts real-time subscription
+  if (callbacks.onArtifacts) {
+    const unsubArtifacts = onSnapshot(
+      collection(db, 'artifacts'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Artifact[] = [];
+          snapshot.forEach((d) => list.push(d.data() as Artifact));
+          callbacks.onArtifacts?.(list);
+        }
+      },
+      (error) => {
+        callbacks.onError?.(error);
+        try {
+          handleFirestoreError(error, OperationType.GET, 'artifacts');
+        } catch {}
+      }
+    );
+    unsubs.push(unsubArtifacts);
+  }
+
+  // 4. Questions real-time subscription
+  if (callbacks.onQuestions) {
+    const unsubQuestions = onSnapshot(
+      collection(db, 'questions'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: QuizQuestion[] = [];
+          snapshot.forEach((d) => list.push(d.data() as QuizQuestion));
+          callbacks.onQuestions?.(list);
+        }
+      },
+      (error) => {
+        callbacks.onError?.(error);
+        try {
+          handleFirestoreError(error, OperationType.GET, 'questions');
+        } catch {}
+      }
+    );
+    unsubs.push(unsubQuestions);
+  }
+
+  // 5. About content real-time subscription
+  if (callbacks.onAbout) {
+    const unsubAbout = onSnapshot(
+      doc(db, 'config', 'about'),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          callbacks.onAbout?.(snapshot.data() as AboutContent);
+        }
+      },
+      (error) => {
+        callbacks.onError?.(error);
+        try {
+          handleFirestoreError(error, OperationType.GET, 'config/about');
+        } catch {}
+      }
+    );
+    unsubs.push(unsubAbout);
+  }
+
+  return () => {
+    unsubs.forEach((unsub) => {
+      try {
+        unsub();
+      } catch {}
+    });
+  };
+}
+
+/**
+ * Check if Cloud Firestore is empty, and if so, populate it with the initial archive
+ * so all connected devices immediately have the shared cloud archive data.
+ */
+export async function seedArchiveIfEmpty(
+  slides: Slide[],
+  categories: Category[],
+  artifacts: Artifact[],
+  questions: QuizQuestion[],
+  aboutContent: AboutContent
+): Promise<boolean> {
+  try {
+    const artSnap = await getDocs(collection(db, 'artifacts'));
+    if (!artSnap.empty) {
+      // Cloud database already has items!
+      return false;
+    }
+
+    console.log('Seeding initial archive data to Cloud Firestore for multi-device sync...');
+    await syncAllToFirestore(slides, categories, artifacts, questions, aboutContent);
+    return true;
   } catch (err) {
-    console.warn('Could not fetch from Firestore, falling back to local archive:', err);
-    return {
-      slides: null,
-      categories: null,
-      artifacts: null,
-      questions: null,
-      aboutContent: null,
-    };
+    console.warn('Could not seed archive:', err);
+    return false;
   }
 }
 
-// Batch Sync Local Archive to Cloud Firestore
-export async function syncArchiveToFirestore(
+/**
+ * Batch Sync Full Archive to Cloud Firestore
+ */
+export async function syncAllToFirestore(
   slides: Slide[],
   categories: Category[],
   artifacts: Artifact[],
@@ -154,40 +280,184 @@ export async function syncArchiveToFirestore(
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     let count = 0;
-    // Sync Slides
+    // Slides
     for (const slide of slides) {
-      await setDoc(doc(db, 'slides', slide.id), slide);
+      await setDoc(doc(db, 'slides', slide.id), cleanFirestoreData(slide));
       count++;
     }
-    // Sync Categories
+    // Categories
     for (const cat of categories) {
-      await setDoc(doc(db, 'categories', cat.id), cat);
+      await setDoc(doc(db, 'categories', cat.id), cleanFirestoreData(cat));
       count++;
     }
-    // Sync Artifacts
+    // Artifacts
     for (const art of artifacts) {
-      await setDoc(doc(db, 'artifacts', art.id), art);
+      await setDoc(doc(db, 'artifacts', art.id), cleanFirestoreData(art));
       count++;
     }
-    // Sync Questions
+    // Questions
     for (const q of questions) {
-      await setDoc(doc(db, 'questions', q.id), q);
+      await setDoc(doc(db, 'questions', q.id), cleanFirestoreData(q));
       count++;
     }
-    // Sync About
-    await setDoc(doc(db, 'config', 'about'), {
-      ...aboutContent,
-      id: 'about',
-    });
+    // About
+    await setDoc(doc(db, 'config', 'about'), cleanFirestoreData({ ...aboutContent, id: 'about' }));
     count++;
 
     return { success: true, count };
   } catch (err) {
     console.error('Failed to sync to Firestore:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'archive');
+    } catch {}
     return {
       success: false,
       count: 0,
       error: err instanceof Error ? err.message : String(err),
     };
+  }
+}
+
+/**
+ * Granular sync helpers: when an admin creates, updates, or deletes slides
+ */
+export async function syncSlidesDiff(oldList: Slide[], newList: Slide[]): Promise<void> {
+  try {
+    const newIds = new Set(newList.map((s) => s.id));
+    // Find deleted
+    for (const old of oldList) {
+      if (!newIds.has(old.id)) {
+        await deleteDoc(doc(db, 'slides', old.id));
+      }
+    }
+    // Find added or modified
+    for (const next of newList) {
+      await setDoc(doc(db, 'slides', next.id), cleanFirestoreData(next));
+    }
+  } catch (err) {
+    console.error('Error syncing slides diff to Firestore:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'slides');
+    } catch {}
+  }
+}
+
+/**
+ * Granular sync helpers: when an admin creates, updates, or deletes categories
+ */
+export async function syncCategoriesDiff(oldList: Category[], newList: Category[]): Promise<void> {
+  try {
+    const newIds = new Set(newList.map((c) => c.id));
+    // Find deleted
+    for (const old of oldList) {
+      if (!newIds.has(old.id)) {
+        await deleteDoc(doc(db, 'categories', old.id));
+      }
+    }
+    // Find added or modified
+    for (const next of newList) {
+      await setDoc(doc(db, 'categories', next.id), cleanFirestoreData(next));
+    }
+  } catch (err) {
+    console.error('Error syncing categories diff to Firestore:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'categories');
+    } catch {}
+  }
+}
+
+/**
+ * Granular sync helpers: when an admin creates, updates, or deletes artifacts
+ */
+export async function syncArtifactsDiff(oldList: Artifact[], newList: Artifact[]): Promise<void> {
+  try {
+    const newIds = new Set(newList.map((a) => a.id));
+    // Find deleted
+    for (const old of oldList) {
+      if (!newIds.has(old.id)) {
+        await deleteDoc(doc(db, 'artifacts', old.id));
+      }
+    }
+    // Find added or modified
+    for (const next of newList) {
+      await setDoc(doc(db, 'artifacts', next.id), cleanFirestoreData(next));
+    }
+  } catch (err) {
+    console.error('Error syncing artifacts diff to Firestore:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'artifacts');
+    } catch {}
+  }
+}
+
+/**
+ * Granular sync helpers: when an admin creates, updates, or deletes questions
+ */
+export async function syncQuestionsDiff(oldList: QuizQuestion[], newList: QuizQuestion[]): Promise<void> {
+  try {
+    const newIds = new Set(newList.map((q) => q.id));
+    // Find deleted
+    for (const old of oldList) {
+      if (!newIds.has(old.id)) {
+        await deleteDoc(doc(db, 'questions', old.id));
+      }
+    }
+    // Find added or modified
+    for (const next of newList) {
+      await setDoc(doc(db, 'questions', next.id), cleanFirestoreData(next));
+    }
+  } catch (err) {
+    console.error('Error syncing questions diff to Firestore:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'questions');
+    } catch {}
+  }
+}
+
+/**
+ * Granular sync helpers: when an admin updates About Content
+ */
+export async function syncAboutContentToFirestore(about: AboutContent): Promise<void> {
+  try {
+    await setDoc(doc(db, 'config', 'about'), cleanFirestoreData({ ...about, id: 'about' }));
+  } catch (err) {
+    console.error('Error syncing about to Firestore:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'config/about');
+    } catch {}
+  }
+}
+
+/**
+ * Reset all Firestore collections to default archive data
+ */
+export async function resetFirestoreToDefaults(
+  defaultSlides: Slide[],
+  defaultCategories: Category[],
+  defaultArtifacts: Artifact[],
+  defaultQuestions: QuizQuestion[],
+  defaultAbout: AboutContent
+): Promise<void> {
+  try {
+    // Delete existing documents
+    const [slidesSnap, catSnap, artSnap, qSnap] = await Promise.all([
+      getDocs(collection(db, 'slides')),
+      getDocs(collection(db, 'categories')),
+      getDocs(collection(db, 'artifacts')),
+      getDocs(collection(db, 'questions')),
+    ]);
+
+    for (const d of slidesSnap.docs) await deleteDoc(d.ref);
+    for (const d of catSnap.docs) await deleteDoc(d.ref);
+    for (const d of artSnap.docs) await deleteDoc(d.ref);
+    for (const d of qSnap.docs) await deleteDoc(d.ref);
+
+    // Re-seed defaults
+    await syncAllToFirestore(defaultSlides, defaultCategories, defaultArtifacts, defaultQuestions, defaultAbout);
+  } catch (err) {
+    console.error('Error resetting Firestore to defaults:', err);
+    try {
+      handleFirestoreError(err, OperationType.WRITE, 'reset');
+    } catch {}
   }
 }

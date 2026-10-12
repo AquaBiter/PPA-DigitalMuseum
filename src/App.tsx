@@ -25,7 +25,18 @@ import { DeviceOrientationGuard } from './components/DeviceOrientationGuard';
 import { WebsiteIntro } from './components/WebsiteIntro';
 import { HelpCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { playInteractionSound, startQuizMusic, stopQuizMusic } from './utils/audioManager';
-import { testConnection, fetchArchiveFromFirestore } from './firebase';
+import {
+  testConnection,
+  subscribeToArchive,
+  seedArchiveIfEmpty,
+  syncAllToFirestore,
+  syncSlidesDiff,
+  syncCategoriesDiff,
+  syncArtifactsDiff,
+  syncQuestionsDiff,
+  syncAboutContentToFirestore,
+  resetFirestoreToDefaults,
+} from './firebase';
 
 import { formatToYouTubeEmbed } from './utils/youtube';
 
@@ -280,19 +291,65 @@ export default function App() {
     };
   }, []);
 
-  // Firebase Firestore Connection & Initial Cloud Sync
+  // Firebase Firestore Connection & Real-Time Live Sync for All Devices (Guests and Admins)
   useEffect(() => {
-    testConnection().then((connected) => {
+    let isSubscribed = true;
+
+    // Check connection and seed initial archive to Cloud if Firestore is empty
+    testConnection().then(async (connected) => {
       if (connected) {
-        fetchArchiveFromFirestore().then((cloud) => {
-          if (cloud.slides && cloud.slides.length > 0) setSlides(cloud.slides);
-          if (cloud.categories && cloud.categories.length > 0) setCategories(cloud.categories);
-          if (cloud.artifacts && cloud.artifacts.length > 0) setArtifacts(cloud.artifacts);
-          if (cloud.questions && cloud.questions.length > 0) setQuestions(cloud.questions);
-          if (cloud.aboutContent) setAboutContent(cloud.aboutContent);
-        });
+        await seedArchiveIfEmpty(
+          INITIAL_SLIDES,
+          sanitizeCategories(INITIAL_CATEGORIES),
+          sanitizeArtifacts(INITIAL_ARTIFACTS),
+          sanitizeQuestions(INITIAL_QUESTIONS),
+          INITIAL_ABOUT_CONTENT
+        );
       }
     });
+
+    // Real-Time onSnapshot listener: When admin makes changes on ANY device,
+    // all connected guests and visitors see changes LIVE in real-time!
+    const unsubscribe = subscribeToArchive({
+      onSlides: (cloudSlides) => {
+        if (!isSubscribed) return;
+        if (cloudSlides && cloudSlides.length > 0) {
+          setSlides(cloudSlides);
+        }
+      },
+      onCategories: (cloudCategories) => {
+        if (!isSubscribed) return;
+        if (cloudCategories && cloudCategories.length > 0) {
+          setCategories(sanitizeCategories(cloudCategories));
+        }
+      },
+      onArtifacts: (cloudArtifacts) => {
+        if (!isSubscribed) return;
+        if (cloudArtifacts && cloudArtifacts.length > 0) {
+          setArtifacts(sanitizeArtifacts(cloudArtifacts));
+        }
+      },
+      onQuestions: (cloudQuestions) => {
+        if (!isSubscribed) return;
+        if (cloudQuestions && cloudQuestions.length > 0) {
+          setQuestions(sanitizeQuestions(cloudQuestions));
+        }
+      },
+      onAbout: (cloudAbout) => {
+        if (!isSubscribed) return;
+        if (cloudAbout) {
+          setAboutContent(cloudAbout);
+        }
+      },
+      onError: (err) => {
+        console.warn('Real-time subscription notice:', err);
+      },
+    });
+
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
   }, []);
 
   // Navigation helper
@@ -374,6 +431,36 @@ export default function App() {
     navigateTo('questions');
   };
 
+  // Cloud Firestore Sync Handlers for Admin changes (Instantly updates Cloud & triggers live updates for all guests)
+  const handleUpdateSlides = (newSlides: Slide[]) => {
+    setSlides(newSlides);
+    syncSlidesDiff(slides, newSlides);
+  };
+
+  const handleUpdateCategories = (newCategories: Category[]) => {
+    setCategories(newCategories);
+    syncCategoriesDiff(categories, newCategories);
+  };
+
+  const handleUpdateArtifacts = (newArtifacts: Artifact[]) => {
+    setArtifacts(newArtifacts);
+    syncArtifactsDiff(artifacts, newArtifacts);
+  };
+
+  const handleUpdateQuestions = (newQuestions: QuizQuestion[]) => {
+    setQuestions(newQuestions);
+    syncQuestionsDiff(questions, newQuestions);
+  };
+
+  const handleUpdateAboutContent = (newAbout: AboutContent) => {
+    setAboutContent(newAbout);
+    syncAboutContentToFirestore(newAbout);
+  };
+
+  const handleForceSyncCloud = async () => {
+    await syncAllToFirestore(slides, categories, artifacts, questions, aboutContent);
+  };
+
   const handleResetDefaults = () => {
     const cleanCats = sanitizeCategories(INITIAL_CATEGORIES);
     const cleanArts = sanitizeArtifacts(INITIAL_ARTIFACTS);
@@ -394,6 +481,15 @@ export default function App() {
     localStorage.removeItem('ppa_about_content');
     localStorage.removeItem('ppa_declined_artifacts');
     setDeclinedArtifactsCategories([]);
+
+    // Also reset Cloud Firestore so all devices see the restored defaults in real-time
+    resetFirestoreToDefaults(
+      INITIAL_SLIDES,
+      cleanCats,
+      cleanArts,
+      cleanQs,
+      INITIAL_ABOUT_CONTENT
+    );
   };
 
   // Find artifacts & questions for current category
@@ -468,12 +564,14 @@ export default function App() {
               }}
               onOpenQuestions={() => navigateTo('questions')}
               onUpdateCategoryBanner={(catId, bannerUrl) => {
-                setCategories((prev) =>
-                  prev.map((c) => (c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c))
+                const updated = categories.map((c) =>
+                  c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
                 );
+                setCategories(updated);
                 setSelectedCategory((prev) =>
                   prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
                 );
+                syncCategoriesDiff(categories, updated);
               }}
             />
           )}
@@ -498,10 +596,10 @@ export default function App() {
               isAdmin={isAdminLoggedIn}
               onSelectQuestion={setSelectedQuestion}
               onUpdateQuestion={(updatedQ) => {
-                setQuestions((prev) =>
-                  prev.map((q) => (q.id === updatedQ.id ? updatedQ : q))
-                );
+                const updated = questions.map((q) => (q.id === updatedQ.id ? updatedQ : q));
+                setQuestions(updated);
                 setSelectedQuestion(updatedQ);
+                syncQuestionsDiff(questions, updated);
               }}
               onNavigateToAdmin={() => navigateTo('admin')}
             />
@@ -521,12 +619,13 @@ export default function App() {
               isAuthenticated={isAdminLoggedIn}
               onLoginSuccess={handleAdminLoginSuccess}
               onLogout={handleAdminLogout}
-              onUpdateSlides={setSlides}
-              onUpdateCategories={setCategories}
-              onUpdateArtifacts={setArtifacts}
-              onUpdateQuestions={setQuestions}
-              onUpdateAboutContent={setAboutContent}
+              onUpdateSlides={handleUpdateSlides}
+              onUpdateCategories={handleUpdateCategories}
+              onUpdateArtifacts={handleUpdateArtifacts}
+              onUpdateQuestions={handleUpdateQuestions}
+              onUpdateAboutContent={handleUpdateAboutContent}
               onResetDefaults={handleResetDefaults}
+              onForceSyncCloud={handleForceSyncCloud}
             />
           )}
         </main>

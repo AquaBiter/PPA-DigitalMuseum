@@ -23,6 +23,8 @@ import {
   Video,
   ExternalLink,
   Link,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Slide,
@@ -51,6 +53,7 @@ interface AdminModalProps {
   onUpdateQuestions: (questions: QuizQuestion[]) => void;
   onUpdateAboutContent: (about: AboutContent) => void;
   onResetDefaults: () => void;
+  onForceSyncCloud?: () => Promise<void> | void;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -68,6 +71,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onUpdateQuestions,
   onUpdateAboutContent,
   onResetDefaults,
+  onForceSyncCloud,
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -748,15 +752,35 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       {/* Dashboard Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-200 gap-4">
         <div>
-          <h2 className="font-bebas text-3xl sm:text-4xl md:text-5xl text-black font-bold tracking-wide">
-            Archive Management Console
-          </h2>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="font-bebas text-3xl sm:text-4xl md:text-5xl text-black font-bold tracking-wide">
+              Archive Management Console
+            </h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Connected to Cloud Firestore: changes appear live on all guest devices">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live Synced
+            </span>
+          </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Create, edit, delete, and manage topics, artifacts, and questions per category.
+            Create, edit, delete, and manage topics, artifacts, and questions. All updates sync live across all visitor devices.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onForceSyncCloud && (
+            <button
+              onClick={async () => {
+                showToast('Syncing all changes to Cloud Firestore...');
+                await onForceSyncCloud();
+                showToast('Archive fully synced to Cloud & live on all devices!');
+              }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+              title="Force push all archive content to Cloud Firestore for live visitor synchronization"
+            >
+              <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+              Sync to Cloud
+            </button>
+          )}
 
           <button
             onClick={() => {

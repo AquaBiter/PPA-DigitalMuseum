@@ -61,7 +61,7 @@
         "fullDescription": {
           "type": "string",
           "description": "Detailed curatorial narrative for the category view",
-          "maxLength": 2000
+          "maxLength": 3000
         },
         "accentColor": {
           "type": "string",
@@ -72,9 +72,13 @@
           "type": "string",
           "description": "Optional custom banner image URL for category",
           "maxLength": 2048
+        },
+        "referenceLinks": {
+          "type": "array",
+          "description": "Source and reference links for the category topic"
         }
       },
-      "required": ["id", "name", "summary", "fullDescription", "accentColor"]
+      "required": ["id", "name", "summary", "fullDescription"]
     },
     "Artifact": {
       "title": "Museum Artifact",
@@ -99,12 +103,12 @@
         "description": {
           "type": "string",
           "description": "Historical description and significance",
-          "maxLength": 3000
+          "maxLength": 4000
         },
         "notes": {
           "type": "string",
           "description": "Key takeaways, insights, or curatorial notes",
-          "maxLength": 2000
+          "maxLength": 3000
         },
         "imageUrl": {
           "type": "string",
@@ -120,6 +124,14 @@
           "type": "string",
           "description": "Title of the embedded archival video",
           "maxLength": 200
+        },
+        "videos": {
+          "type": "array",
+          "description": "Multiple embedded video entries"
+        },
+        "noVideoEmbed": {
+          "type": "boolean",
+          "description": "Whether to omit video embeds"
         }
       },
       "required": ["id", "categoryId", "title", "description", "notes"]
@@ -163,6 +175,10 @@
           "type": "string",
           "description": "Optional illustration or reference image URL",
           "maxLength": 2048
+        },
+        "choices": {
+          "type": "array",
+          "description": "Multiple choice option choices"
         }
       },
       "required": ["id", "categoryId", "questionText", "correctChoiceId"]
@@ -191,6 +207,10 @@
           "type": "string",
           "description": "Heading for the cultural timeline section",
           "maxLength": 200
+        },
+        "milestones": {
+          "type": "array",
+          "description": "Historical timeline milestones"
         }
       },
       "required": ["id", "paragraph1", "paragraph2"]
