@@ -37,6 +37,7 @@ import {
   TimelineMilestone,
 } from '../types';
 import { formatToYouTubeEmbed, parseMultipleYouTubeUrls, extractYouTubeId } from '../utils/youtube';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface AdminModalProps {
   slides: Slide[];
@@ -119,44 +120,52 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setLoginError('');
   };
 
-  // Image Upload handler from Local Device Storage
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload handler from Local Device Storage with auto-compression
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !uploadTarget) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const resultDataUrl = reader.result as string;
+    try {
+      showToast('Optimizing and compressing image...');
+      // Compress to lightweight web-safe image (<150KB) to prevent Firestore 1MB limits & localStorage quota errors
+      const resultDataUrl = await compressImageFile(file, {
+        maxWidth: 1200,
+        maxHeight: 900,
+        quality: 0.78,
+      });
 
       if (uploadTarget.type === 'slide') {
         const updated = slides.map((s) =>
           s.id === uploadTarget.id ? { ...s, imageUrl: resultDataUrl } : s
         );
         onUpdateSlides(updated);
-        showToast('Image uploaded from device to hero slide!');
+        showToast('Image uploaded and optimized for hero slide!');
       } else if (uploadTarget.type === 'artifact') {
         const updated = artifacts.map((a) =>
           a.id === uploadTarget.id ? { ...a, imageUrl: resultDataUrl } : a
         );
         onUpdateArtifacts(updated);
-        showToast('Image uploaded from device to artifact!');
+        showToast('Image uploaded and optimized for artifact!');
       } else if (uploadTarget.type === 'category') {
         const updated = categories.map((c) =>
           c.id === uploadTarget.id ? { ...c, bannerImageUrl: resultDataUrl } : c
         );
         onUpdateCategories(updated);
-        showToast('Banner graphic uploaded for topic!');
+        showToast('Banner graphic uploaded and optimized!');
       } else if (uploadTarget.type === 'question') {
         const updated = questions.map((q) =>
           q.id === uploadTarget.id ? { ...q, imageUrl: resultDataUrl } : q
         );
         onUpdateQuestions(updated);
-        showToast('Reference image uploaded for question!');
+        showToast('Reference image uploaded and optimized for question!');
       }
+    } catch (err) {
+      console.error('Error compressing uploaded image:', err);
+      showToast('Failed to process image. Please try a different image.');
+    } finally {
       setUploadTarget(null);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+      e.target.value = '';
+    }
   };
 
   const triggerUpload = (type: 'slide' | 'artifact' | 'category' | 'question', id: string) => {

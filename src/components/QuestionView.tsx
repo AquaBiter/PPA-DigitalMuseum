@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { RotateCcw, CheckCircle2, AlertCircle, HelpCircle, ArrowRight, Camera, Lock, Check, Volume2, VolumeX } from 'lucide-react';
 import { QuizQuestion, Artifact, Category } from '../types';
 import { playInteractionSound, toggleQuizMusicMute, getIsQuizMuted } from '../utils/audioManager';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface QuestionViewProps {
   question?: QuizQuestion;
@@ -97,20 +98,25 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
     setLockedNotice(null);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !question || !onUpdateQuestion) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    try {
+      const dataUrl = await compressImageFile(file, {
+        maxWidth: 1000,
+        maxHeight: 800,
+        quality: 0.78,
+      });
       onUpdateQuestion({
         ...question,
         imageUrl: dataUrl,
       });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    } catch (err) {
+      console.error('Failed to compress question image:', err);
+    } finally {
+      e.target.value = '';
+    }
   };
 
   // If this category has no questions yet, show clean topic-specific empty state

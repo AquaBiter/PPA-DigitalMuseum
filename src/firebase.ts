@@ -80,11 +80,18 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 /**
  * Strips undefined properties recursively so Firestore does not reject writes.
+ * Also safeguards against oversized data URLs exceeding Firestore's 1MB document limit.
  */
 export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Record<string, any> {
   const clean: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
+      if (typeof value === 'string' && value.startsWith('data:image') && value.length > 780000) {
+        console.warn(
+          `[Firestore Data Protection] Dropping field "${key}" because size (${value.length} chars) exceeds the safe Firestore document limit.`
+        );
+        continue;
+      }
       if (Array.isArray(value)) {
         clean[key] = value.map((item) =>
           typeof item === 'object' && item !== null ? cleanFirestoreData(item) : item

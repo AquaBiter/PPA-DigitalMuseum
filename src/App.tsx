@@ -40,6 +40,44 @@ import {
 
 import { formatToYouTubeEmbed } from './utils/youtube';
 
+// Safe localStorage helper to prevent QuotaExceededError from breaking the UI
+export const safeLocalStorageSet = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`[LocalStorage] Quota exceeded or storage restricted for "${key}":`, err);
+    // Fallback if slides quota exceeded: strip large data URLs from cache
+    if (key === 'ppa_slides') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const stripped = parsed.map((s: Slide) => ({
+            ...s,
+            imageUrl: s.imageUrl?.startsWith('data:') ? undefined : s.imageUrl,
+          }));
+          localStorage.setItem(key, JSON.stringify(stripped));
+        }
+      } catch {}
+    }
+  }
+};
+
+export const safeLocalStorageRemove = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+};
+
+// Safe slide sanitizer to prevent oversized base64 images from exceeding limits
+const sanitizeSlides = (rawSlides: Slide[]): Slide[] =>
+  rawSlides.map((s) => {
+    if (s.imageUrl && s.imageUrl.startsWith('data:') && s.imageUrl.length > 780000) {
+      console.warn(`[Slide Safety] Dropped oversized data URL for slide ${s.id} (${s.imageUrl.length} bytes)`);
+      return { ...s, imageUrl: undefined };
+    }
+    return s;
+  });
+
 // Helper to sanitize any legacy "ex." prefix from persisted localStorage data
 const sanitizeCategories = (cats: Category[]): Category[] =>
   cats.map((c) => {
@@ -47,11 +85,16 @@ const sanitizeCategories = (cats: Category[]): Category[] =>
     const referenceLinks = Array.isArray(c.referenceLinks)
       ? c.referenceLinks
       : (initialMatch?.referenceLinks || []);
+    const bannerImageUrl =
+      c.bannerImageUrl && c.bannerImageUrl.startsWith('data:') && c.bannerImageUrl.length > 780000
+        ? undefined
+        : c.bannerImageUrl;
     return {
       ...c,
       name: c.name.replace(/^(ex\.|ex)\s*/i, ''),
       fullDescription: c.fullDescription.replace(/^(ex\.|ex)\s*/i, ''),
       referenceLinks,
+      bannerImageUrl,
     };
   });
 
@@ -77,11 +120,16 @@ const sanitizeArtifacts = (arts: Artifact[]): Artifact[] =>
         url: formatToYouTubeEmbed(v.url),
       }));
     }
+    const imageUrl =
+      a.imageUrl && a.imageUrl.startsWith('data:') && a.imageUrl.length > 780000
+        ? undefined
+        : a.imageUrl;
     return {
       ...a,
       title: a.title.replace(/^(ex\.|ex)\s*/i, ''),
       description: a.description.replace(/^(ex\.|ex)\s*/i, ''),
       notes: a.notes.replace(/^(ex\.|ex)\s*/i, ''),
+      imageUrl,
       videos,
       videoUrl: videos[0]?.url || a.videoUrl || '',
       videoTitle: videos[0]?.title || a.videoTitle || '',
@@ -90,19 +138,26 @@ const sanitizeArtifacts = (arts: Artifact[]): Artifact[] =>
   });
 
 const sanitizeQuestions = (qs: QuizQuestion[]): QuizQuestion[] =>
-  qs.map((q) => ({
-    ...q,
-    questionText: q.questionText.replace(/^(ex\.|ex)\s*/i, ''),
-  }));
+  qs.map((q) => {
+    const imageUrl =
+      q.imageUrl && q.imageUrl.startsWith('data:') && q.imageUrl.length > 780000
+        ? undefined
+        : q.imageUrl;
+    return {
+      ...q,
+      imageUrl,
+      questionText: q.questionText.replace(/^(ex\.|ex)\s*/i, ''),
+    };
+  });
 
 export default function App() {
   // Persistent state in localStorage
   const [slides, setSlides] = useState<Slide[]>(() => {
     try {
       const saved = localStorage.getItem('ppa_slides');
-      return saved ? JSON.parse(saved) : INITIAL_SLIDES;
+      return saved ? sanitizeSlides(JSON.parse(saved)) : sanitizeSlides(INITIAL_SLIDES);
     } catch {
-      return INITIAL_SLIDES;
+      return sanitizeSlides(INITIAL_SLIDES);
     }
   });
 
@@ -184,25 +239,25 @@ export default function App() {
     } catch {}
   };
 
-  // Save changes to localStorage
+  // Save changes to localStorage with quota-safe protection
   useEffect(() => {
-    localStorage.setItem('ppa_slides', JSON.stringify(slides));
+    safeLocalStorageSet('ppa_slides', JSON.stringify(slides));
   }, [slides]);
 
   useEffect(() => {
-    localStorage.setItem('ppa_categories', JSON.stringify(categories));
+    safeLocalStorageSet('ppa_categories', JSON.stringify(categories));
   }, [categories]);
 
   useEffect(() => {
-    localStorage.setItem('ppa_artifacts', JSON.stringify(artifacts));
+    safeLocalStorageSet('ppa_artifacts', JSON.stringify(artifacts));
   }, [artifacts]);
 
   useEffect(() => {
-    localStorage.setItem('ppa_questions', JSON.stringify(questions));
+    safeLocalStorageSet('ppa_questions', JSON.stringify(questions));
   }, [questions]);
 
   useEffect(() => {
-    localStorage.setItem('ppa_about_content', JSON.stringify(aboutContent));
+    safeLocalStorageSet('ppa_about_content', JSON.stringify(aboutContent));
   }, [aboutContent]);
 
   // Navigation State
@@ -314,7 +369,7 @@ export default function App() {
       onSlides: (cloudSlides) => {
         if (!isSubscribed) return;
         if (cloudSlides && cloudSlides.length > 0) {
-          setSlides(cloudSlides);
+          setSlides(sanitizeSlides(cloudSlides));
         }
       },
       onCategories: (cloudCategories) => {
@@ -473,13 +528,12 @@ export default function App() {
     setAboutContent(INITIAL_ABOUT_CONTENT);
     setSelectedCategory(cleanCats.find((c) => c.id === 'social') || cleanCats[0]);
     setSelectedArtifact(cleanArts.find((a) => a.id === 'nokia-phones') || cleanArts[0]);
-    setSelectedQuestion(cleanQs[0]);
-    localStorage.removeItem('ppa_slides');
-    localStorage.removeItem('ppa_categories');
-    localStorage.removeItem('ppa_artifacts');
-    localStorage.removeItem('ppa_questions');
-    localStorage.removeItem('ppa_about_content');
-    localStorage.removeItem('ppa_declined_artifacts');
+    safeLocalStorageRemove('ppa_slides');
+    safeLocalStorageRemove('ppa_categories');
+    safeLocalStorageRemove('ppa_artifacts');
+    safeLocalStorageRemove('ppa_questions');
+    safeLocalStorageRemove('ppa_about_content');
+    safeLocalStorageRemove('ppa_declined_artifacts');
     setDeclinedArtifactsCategories([]);
 
     // Also reset Cloud Firestore so all devices see the restored defaults in real-time

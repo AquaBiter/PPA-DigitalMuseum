@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Camera, ExternalLink, BookOpen } from 'lucide-react';
 import { Category } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface CategoryDetailProps {
   category: Category;
@@ -21,15 +22,21 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !onUpdateCategoryBanner) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onUpdateCategoryBanner(category.id, reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      const compressed = await compressImageFile(file, {
+        maxWidth: 1200,
+        maxHeight: 800,
+        quality: 0.78,
+      });
+      onUpdateCategoryBanner(category.id, compressed);
+    } catch (err) {
+      console.error('Failed to compress banner image:', err);
+    } finally {
+      e.target.value = '';
+    }
   };
   return (
     <div className="w-full min-h-[calc(100vh-120px)] bg-white px-4 sm:px-8 md:px-12 lg:px-16 py-6 sm:py-8 max-w-7xl mx-auto">

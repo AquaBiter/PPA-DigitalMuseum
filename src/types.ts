@@ -35,7 +35,7 @@ export interface Artifact {
   title: string;
   description: string;
   notes: string;
-  imageUrl: string;
+  imageUrl?: string;
   videoUrl: string;
   videoTitle?: string;
   videos?: ArtifactVideo[];
