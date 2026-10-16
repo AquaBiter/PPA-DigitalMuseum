@@ -36,6 +36,8 @@ import {
   syncQuestionsDiff,
   syncAboutContentToFirestore,
   resetFirestoreToDefaults,
+  isFirestoreQuotaExhausted,
+  onQuotaExhaustedChanged,
 } from './firebase';
 
 import { formatToYouTubeEmbed } from './utils/youtube';
@@ -238,6 +240,15 @@ export default function App() {
       localStorage.removeItem('ppa_admin_logged_in');
     } catch {}
   };
+
+  // Cloud Quota Exhaustion state (detects if free daily quota reached to pause attempts gracefully)
+  const [isCloudQuotaPaused, setIsCloudQuotaPaused] = useState<boolean>(() => isFirestoreQuotaExhausted());
+
+  useEffect(() => {
+    return onQuotaExhaustedChanged((exhausted) => {
+      setIsCloudQuotaPaused(exhausted);
+    });
+  }, []);
 
   // Save changes to localStorage with quota-safe protection
   useEffect(() => {
@@ -680,6 +691,7 @@ export default function App() {
               onUpdateAboutContent={handleUpdateAboutContent}
               onResetDefaults={handleResetDefaults}
               onForceSyncCloud={handleForceSyncCloud}
+              isCloudQuotaPaused={isCloudQuotaPaused}
             />
           )}
         </main>

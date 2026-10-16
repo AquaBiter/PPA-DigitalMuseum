@@ -38,6 +38,7 @@ import {
 } from '../types';
 import { formatToYouTubeEmbed, parseMultipleYouTubeUrls, extractYouTubeId } from '../utils/youtube';
 import { compressImageFile } from '../utils/imageCompressor';
+import { pruneStorageHistory, forceRetrySync, getPendingOutbox } from '../firebase';
 
 interface AdminModalProps {
   slides: Slide[];
@@ -55,6 +56,7 @@ interface AdminModalProps {
   onUpdateAboutContent: (about: AboutContent) => void;
   onResetDefaults: () => void;
   onForceSyncCloud?: () => Promise<void> | void;
+  isCloudQuotaPaused?: boolean;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -73,6 +75,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onUpdateAboutContent,
   onResetDefaults,
   onForceSyncCloud,
+  isCloudQuotaPaused = false,
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -93,6 +96,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [selectedQuestionCategory, setSelectedQuestionCategory] = useState<string>(() => {
     return categories[0]?.id || 'social';
   });
+
+  // Outbox count for write coalescing & token recovery
+  const [pendingOutboxCount, setPendingOutboxCount] = useState<number>(() => getPendingOutbox().length);
+
+  React.useEffect(() => {
+    const handleOutboxUpdate = (e: any) => {
+      setPendingOutboxCount(e.detail?.count ?? getPendingOutbox().length);
+    };
+    window.addEventListener('ppa_outbox_updated', handleOutboxUpdate);
+    return () => window.removeEventListener('ppa_outbox_updated', handleOutboxUpdate);
+  }, []);
 
   // File input ref for local storage device upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -765,20 +779,65 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             <h2 className="font-bebas text-3xl sm:text-4xl md:text-5xl text-black font-bold tracking-wide">
               Archive Management Console
             </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Connected to Cloud Firestore: changes appear live on all guest devices">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live Synced
-            </span>
+            {isCloudQuotaPaused ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200" title="Daily cloud write quota reached. Changes are safely saved locally in your browser and active.">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Cloud Quota Paused (Local Active)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Connected to Cloud Firestore: changes appear live on all guest devices">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live Synced
+              </span>
+            )}
+            {pendingOutboxCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200" title="Coalesced writes ready to flush. Superseded versions are automatically deleted from history to save write tokens.">
+                <span>{pendingOutboxCount} queued</span>
+              </span>
+            )}
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Create, edit, delete, and manage topics, artifacts, and questions. All updates sync live across all visitor devices.
+            Create, edit, delete, and manage topics, artifacts, and questions. Write coalescing actively purges superseded edits from history to recover write tokens.
           </p>
+          {isCloudQuotaPaused && (
+            <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200 rounded-lg flex items-start gap-2 text-xs text-amber-900 leading-snug">
+              <Cloud className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Cloud daily write limit reached for today:</strong> All changes continue to save locally in your browser and are queued in the compact Outbox. Superseded edits are deleted from history to preserve quota.
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {isCloudQuotaPaused && (
+            <button
+              onClick={async () => {
+                showToast('Attempting to flush queued writes to Cloud...');
+                const result = await forceRetrySync();
+                if (result.processed > 0) {
+                  showToast(`Successfully synced ${result.processed} queued changes to Cloud!`);
+                } else if (result.error) {
+                  showToast(result.error);
+                } else {
+                  showToast('Outbox empty. Everything is up to date.');
+                }
+              }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-black bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+              title="Clear daily quota cooldown and attempt flushing pending outbox to Cloud"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+              Retry Cloud Sync
+            </button>
+          )}
+
           {onForceSyncCloud && (
             <button
               onClick={async () => {
+                if (isCloudQuotaPaused) {
+                  showToast('Cloud daily limit reached for today. Changes are active locally in your browser.');
+                  return;
+                }
                 showToast('Syncing all changes to Cloud Firestore...');
                 await onForceSyncCloud();
                 showToast('Archive fully synced to Cloud & live on all devices!');
@@ -790,6 +849,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               Sync to Cloud
             </button>
           )}
+
+          <button
+            onClick={() => {
+              const res = pruneStorageHistory();
+              showToast(
+                res.recoveredKeys > 0
+                  ? `Pruned ${res.recoveredKeys} stale items from history to recover storage space!`
+                  : 'Storage history is already compact & clean!'
+              );
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 hover:text-black bg-zinc-100 hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+            title="Delete previous superseded writes and stale caches from history to recover storage space"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-zinc-500" />
+            Prune History
+          </button>
 
           <button
             onClick={() => {

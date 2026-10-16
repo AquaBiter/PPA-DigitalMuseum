@@ -9,7 +9,6 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
-  writeBatch,
   Unsubscribe,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -56,7 +55,112 @@ export interface FirestoreErrorInfo {
   };
 }
 
+// Key used to store daily write quota exhausted timestamp in browser storage
+const QUOTA_EXHAUSTED_KEY = 'ppa_firestore_quota_exhausted';
+// 1 hour cooldown before attempting cloud writes again after a quota limit
+const QUOTA_COOLDOWN_MS = 60 * 60 * 1000;
+
+const OUTBOX_STORAGE_KEY = 'ppa_pending_outbox';
+const FLUSH_DEBOUNCE_MS = 1200;
+
+export interface PendingWrite {
+  key: string; // e.g. "artifacts:nokia-3310"
+  collectionName: 'slides' | 'categories' | 'artifacts' | 'questions' | 'config';
+  docId: string;
+  action: 'set' | 'delete';
+  data?: any;
+  timestamp: number;
+}
+
+/**
+ * Checks whether the free tier daily write quota is currently marked as exhausted.
+ */
+export function isFirestoreQuotaExhausted(): boolean {
+  try {
+    const raw = localStorage.getItem(QUOTA_EXHAUSTED_KEY);
+    if (!raw) return false;
+    const timestamp = parseInt(raw, 10);
+    if (isNaN(timestamp)) return false;
+    if (Date.now() - timestamp > QUOTA_COOLDOWN_MS) {
+      localStorage.removeItem(QUOTA_EXHAUSTED_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Marks the daily write quota as exhausted to prevent infinite backoff retry loops.
+ */
+export function markFirestoreQuotaExhausted(): void {
+  try {
+    localStorage.setItem(QUOTA_EXHAUSTED_KEY, Date.now().toString());
+    window.dispatchEvent(new Event('firestore-quota-changed'));
+  } catch {}
+}
+
+/**
+ * Clears the quota exhausted flag manually.
+ */
+export function clearFirestoreQuotaExhausted(): void {
+  try {
+    localStorage.removeItem(QUOTA_EXHAUSTED_KEY);
+    window.dispatchEvent(new Event('firestore-quota-changed'));
+  } catch {}
+}
+
+/**
+ * Helper to test if an error represents a resource exhaustion or quota limit.
+ */
+export function isQuotaExceededError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = (error as any)?.code;
+  return (
+    code === 'resource-exhausted' ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('Quota limit exceeded') ||
+    msg.includes('Free daily write units')
+  );
+}
+
+/**
+ * Checks error and marks quota exhausted if applicable. Returns true if quota error was handled.
+ */
+export function checkAndMarkQuotaExhausted(error: unknown): boolean {
+  if (isQuotaExceededError(error)) {
+    markFirestoreQuotaExhausted();
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Subscribes to quota status changes.
+ */
+export function onQuotaExhaustedChanged(listener: (isExhausted: boolean) => void): () => void {
+  const handler = () => {
+    listener(isFirestoreQuotaExhausted());
+  };
+  window.addEventListener('storage', handler);
+  window.addEventListener('firestore-quota-changed', handler);
+  return () => {
+    window.removeEventListener('storage', handler);
+    window.removeEventListener('firestore-quota-changed', handler);
+  };
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  // Gracefully handle daily write quota limits to prevent unhandled promise rejections
+  if (checkAndMarkQuotaExhausted(error)) {
+    console.warn(
+      `[Firestore Quota Guard] Free daily write quota reached for project. Operation ${operationType} on ${path} paused. Falling back to offline local storage.`
+    );
+    return;
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -112,6 +216,10 @@ export async function testConnection(): Promise<boolean> {
     await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      markFirestoreQuotaExhausted();
+      return true; // Still connected for reading, write quota is marked
+    }
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.warn('Firebase client is offline or connecting...');
       return false;
@@ -119,6 +227,182 @@ export async function testConnection(): Promise<boolean> {
     return true;
   }
 }
+
+// -------------------------------------------------------------
+// PENDING WRITE OUTBOX, WRITE COALESCING & HISTORY PRUNING
+// -------------------------------------------------------------
+
+export function getPendingOutbox(): PendingWrite[] {
+  try {
+    const raw = localStorage.getItem(OUTBOX_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePendingOutbox(queue: PendingWrite[]): void {
+  try {
+    localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(queue));
+    window.dispatchEvent(new CustomEvent('ppa_outbox_updated', { detail: { count: queue.length } }));
+  } catch (err) {
+    console.warn('[SyncQueue] Storage full while saving outbox, pruning older entries:', err);
+    pruneStorageHistory();
+    try {
+      const trimmed = queue.slice(-30);
+      localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(trimmed));
+    } catch {}
+  }
+}
+
+let flushTimeout: any = null;
+let isFlushing = false;
+
+/**
+ * Enqueue a write operation.
+ * Previous intermediate writes for the same document are deleted from history
+ * to recover write tokens and keep the payload compact.
+ */
+export function enqueueWrite(
+  collectionName: 'slides' | 'categories' | 'artifacts' | 'questions' | 'config',
+  docId: string,
+  action: 'set' | 'delete',
+  data?: any
+): void {
+  const key = `${collectionName}:${docId}`;
+  let outbox = getPendingOutbox();
+
+  // Write Coalescing: delete previous version of this document from history
+  const previousIdx = outbox.findIndex((item) => item.key === key);
+  if (previousIdx >= 0) {
+    const previous = outbox[previousIdx];
+    // If it was just added in queue and now deleted, cancel both out to save 2 writes!
+    if (previous.action === 'set' && action === 'delete') {
+      outbox.splice(previousIdx, 1);
+      savePendingOutbox(outbox);
+      return;
+    }
+    // Delete older revision from queue history
+    outbox.splice(previousIdx, 1);
+  }
+
+  outbox.push({
+    key,
+    collectionName,
+    docId,
+    action,
+    data: data ? cleanFirestoreData(data) : undefined,
+    timestamp: Date.now(),
+  });
+
+  savePendingOutbox(outbox);
+
+  // Debounced flush
+  if (flushTimeout) clearTimeout(flushTimeout);
+  flushTimeout = setTimeout(() => {
+    flushPendingOutbox();
+  }, FLUSH_DEBOUNCE_MS);
+}
+
+/**
+ * Flushes all pending writes to Firestore.
+ * If quota is exceeded, gracefully keeps writes queued in localStorage until quota resets.
+ */
+export async function flushPendingOutbox(): Promise<{ processed: number; remaining: number; error?: string }> {
+  if (isFlushing) return { processed: 0, remaining: getPendingOutbox().length };
+  if (isFirestoreQuotaExhausted()) {
+    return {
+      processed: 0,
+      remaining: getPendingOutbox().length,
+      error: 'Daily write quota is currently exhausted. Writes are preserved in local outbox.',
+    };
+  }
+
+  let outbox = getPendingOutbox();
+  if (outbox.length === 0) return { processed: 0, remaining: 0 };
+
+  isFlushing = true;
+  let processedCount = 0;
+  const remainingQueue: PendingWrite[] = [];
+
+  for (let i = 0; i < outbox.length; i++) {
+    const item = outbox[i];
+
+    if (isFirestoreQuotaExhausted()) {
+      remainingQueue.push(...outbox.slice(i));
+      break;
+    }
+
+    try {
+      const docRef = doc(db, item.collectionName, item.docId);
+      if (item.action === 'delete') {
+        await deleteDoc(docRef);
+      } else if (item.data) {
+        await setDoc(docRef, item.data);
+      }
+      processedCount++;
+    } catch (err: any) {
+      if (checkAndMarkQuotaExhausted(err)) {
+        console.warn('[SyncQueue] Daily write quota reached during flush. Remaining items will sync on reset.');
+        remainingQueue.push(...outbox.slice(i));
+        break;
+      } else {
+        console.error(`[SyncQueue] Failed to write ${item.key}:`, err);
+        remainingQueue.push(item);
+      }
+    }
+  }
+
+  isFlushing = false;
+  savePendingOutbox(remainingQueue);
+  return { processed: processedCount, remaining: remainingQueue.length };
+}
+
+/**
+ * Prunes obsolete localStorage history, temporary caches, and redundant data
+ * to recover local storage space and prevent QuotaExceededError.
+ */
+export function pruneStorageHistory(): { recoveredKeys: number } {
+  let count = 0;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      if (
+        key.startsWith('temp_') ||
+        key.startsWith('draft_') ||
+        key.includes('_backup_') ||
+        key.startsWith('cache_')
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((k) => {
+      localStorage.removeItem(k);
+      count++;
+    });
+
+    console.log(`[Storage Pruner] Cleaned up ${count} stale history/cache keys to recover storage tokens.`);
+  } catch (err) {
+    console.warn('[Storage Pruner] Error during history pruning:', err);
+  }
+  return { recoveredKeys: count };
+}
+
+/**
+ * Manually force a retry: clears quota cooldown flag and immediately flushes the compact outbox.
+ */
+export async function forceRetrySync(): Promise<{ processed: number; remaining: number; error?: string }> {
+  clearFirestoreQuotaExhausted();
+  return await flushPendingOutbox();
+}
+
+// -------------------------------------------------------------
+// REAL-TIME SUBSCRIBER
+// -------------------------------------------------------------
 
 export interface ArchiveSubscribeCallbacks {
   onSlides?: (slides: Slide[]) => void;
@@ -148,10 +432,12 @@ export function subscribeToArchive(callbacks: ArchiveSubscribeCallbacks): () => 
         }
       },
       (error) => {
-        callbacks.onError?.(error);
-        try {
-          handleFirestoreError(error, OperationType.GET, 'slides');
-        } catch {}
+        if (!isQuotaExceededError(error)) {
+          callbacks.onError?.(error);
+          try {
+            handleFirestoreError(error, OperationType.GET, 'slides');
+          } catch {}
+        }
       }
     );
     unsubs.push(unsubSlides);
@@ -169,10 +455,12 @@ export function subscribeToArchive(callbacks: ArchiveSubscribeCallbacks): () => 
         }
       },
       (error) => {
-        callbacks.onError?.(error);
-        try {
-          handleFirestoreError(error, OperationType.GET, 'categories');
-        } catch {}
+        if (!isQuotaExceededError(error)) {
+          callbacks.onError?.(error);
+          try {
+            handleFirestoreError(error, OperationType.GET, 'categories');
+          } catch {}
+        }
       }
     );
     unsubs.push(unsubCategories);
@@ -190,10 +478,12 @@ export function subscribeToArchive(callbacks: ArchiveSubscribeCallbacks): () => 
         }
       },
       (error) => {
-        callbacks.onError?.(error);
-        try {
-          handleFirestoreError(error, OperationType.GET, 'artifacts');
-        } catch {}
+        if (!isQuotaExceededError(error)) {
+          callbacks.onError?.(error);
+          try {
+            handleFirestoreError(error, OperationType.GET, 'artifacts');
+          } catch {}
+        }
       }
     );
     unsubs.push(unsubArtifacts);
@@ -211,16 +501,18 @@ export function subscribeToArchive(callbacks: ArchiveSubscribeCallbacks): () => 
         }
       },
       (error) => {
-        callbacks.onError?.(error);
-        try {
-          handleFirestoreError(error, OperationType.GET, 'questions');
-        } catch {}
+        if (!isQuotaExceededError(error)) {
+          callbacks.onError?.(error);
+          try {
+            handleFirestoreError(error, OperationType.GET, 'questions');
+          } catch {}
+        }
       }
     );
     unsubs.push(unsubQuestions);
   }
 
-  // 5. About content real-time subscription
+  // 5. About Config real-time subscription
   if (callbacks.onAbout) {
     const unsubAbout = onSnapshot(
       doc(db, 'config', 'about'),
@@ -230,10 +522,12 @@ export function subscribeToArchive(callbacks: ArchiveSubscribeCallbacks): () => 
         }
       },
       (error) => {
-        callbacks.onError?.(error);
-        try {
-          handleFirestoreError(error, OperationType.GET, 'config/about');
-        } catch {}
+        if (!isQuotaExceededError(error)) {
+          callbacks.onError?.(error);
+          try {
+            handleFirestoreError(error, OperationType.GET, 'config/about');
+          } catch {}
+        }
       }
     );
     unsubs.push(unsubAbout);
@@ -259,17 +553,34 @@ export async function seedArchiveIfEmpty(
   questions: QuizQuestion[],
   aboutContent: AboutContent
 ): Promise<boolean> {
+  if (isFirestoreQuotaExhausted()) {
+    return false;
+  }
+
   try {
+    if (localStorage.getItem('ppa_cloud_seeded') === 'true') {
+      return false;
+    }
+
     const artSnap = await getDocs(collection(db, 'artifacts'));
     if (!artSnap.empty) {
-      // Cloud database already has items!
+      try {
+        localStorage.setItem('ppa_cloud_seeded', 'true');
+      } catch {}
       return false;
     }
 
     console.log('Seeding initial archive data to Cloud Firestore for multi-device sync...');
     await syncAllToFirestore(slides, categories, artifacts, questions, aboutContent);
+    try {
+      localStorage.setItem('ppa_cloud_seeded', 'true');
+    } catch {}
     return true;
   } catch (err) {
+    if (checkAndMarkQuotaExhausted(err)) {
+      console.warn('[Firestore] Seed skipped: daily quota limit reached.');
+      return false;
+    }
     console.warn('Could not seed archive:', err);
     return false;
   }
@@ -285,6 +596,21 @@ export async function syncAllToFirestore(
   questions: QuizQuestion[],
   aboutContent: AboutContent
 ): Promise<{ success: boolean; count: number; error?: string }> {
+  if (isFirestoreQuotaExhausted()) {
+    // Enqueue all items into compact outbox so none are lost
+    for (const slide of slides) enqueueWrite('slides', slide.id, 'set', slide);
+    for (const cat of categories) enqueueWrite('categories', cat.id, 'set', cat);
+    for (const art of artifacts) enqueueWrite('artifacts', art.id, 'set', art);
+    for (const q of questions) enqueueWrite('questions', q.id, 'set', q);
+    enqueueWrite('config', 'about', 'set', { ...aboutContent, id: 'about' });
+
+    return {
+      success: false,
+      count: 0,
+      error: 'Daily Cloud write quota reached. Changes are saved locally and queued in Outbox for syncing when quota resets.',
+    };
+  }
+
   try {
     let count = 0;
     // Slides
@@ -313,6 +639,14 @@ export async function syncAllToFirestore(
 
     return { success: true, count };
   } catch (err) {
+    if (checkAndMarkQuotaExhausted(err)) {
+      console.warn('[Firestore] Push to cloud paused: daily write quota reached.');
+      return {
+        success: false,
+        count: 0,
+        error: 'Daily Cloud write quota reached for today. Changes are active and stored in your browser.',
+      };
+    }
     console.error('Failed to sync to Firestore:', err);
     try {
       handleFirestoreError(err, OperationType.WRITE, 'archive');
@@ -327,97 +661,93 @@ export async function syncAllToFirestore(
 
 /**
  * Granular sync helpers: when an admin creates, updates, or deletes slides
+ * Uses write coalescing: deletes superseded updates from history.
  */
 export async function syncSlidesDiff(oldList: Slide[], newList: Slide[]): Promise<void> {
-  try {
-    const newIds = new Set(newList.map((s) => s.id));
-    // Find deleted
-    for (const old of oldList) {
-      if (!newIds.has(old.id)) {
-        await deleteDoc(doc(db, 'slides', old.id));
-      }
+  const oldMap = new Map(oldList.map((s) => [s.id, s]));
+  const newIds = new Set(newList.map((s) => s.id));
+
+  // Find deleted
+  for (const old of oldList) {
+    if (!newIds.has(old.id)) {
+      enqueueWrite('slides', old.id, 'delete');
     }
-    // Find added or modified
-    for (const next of newList) {
-      await setDoc(doc(db, 'slides', next.id), cleanFirestoreData(next));
+  }
+  // Find added or modified ONLY
+  for (const next of newList) {
+    const prev = oldMap.get(next.id);
+    if (!prev || JSON.stringify(cleanFirestoreData(prev)) !== JSON.stringify(cleanFirestoreData(next))) {
+      enqueueWrite('slides', next.id, 'set', next);
     }
-  } catch (err) {
-    console.error('Error syncing slides diff to Firestore:', err);
-    try {
-      handleFirestoreError(err, OperationType.WRITE, 'slides');
-    } catch {}
   }
 }
 
 /**
  * Granular sync helpers: when an admin creates, updates, or deletes categories
+ * Uses write coalescing: deletes superseded updates from history.
  */
 export async function syncCategoriesDiff(oldList: Category[], newList: Category[]): Promise<void> {
-  try {
-    const newIds = new Set(newList.map((c) => c.id));
-    // Find deleted
-    for (const old of oldList) {
-      if (!newIds.has(old.id)) {
-        await deleteDoc(doc(db, 'categories', old.id));
-      }
+  const oldMap = new Map(oldList.map((c) => [c.id, c]));
+  const newIds = new Set(newList.map((c) => c.id));
+
+  // Find deleted
+  for (const old of oldList) {
+    if (!newIds.has(old.id)) {
+      enqueueWrite('categories', old.id, 'delete');
     }
-    // Find added or modified
-    for (const next of newList) {
-      await setDoc(doc(db, 'categories', next.id), cleanFirestoreData(next));
+  }
+  // Find added or modified ONLY
+  for (const next of newList) {
+    const prev = oldMap.get(next.id);
+    if (!prev || JSON.stringify(cleanFirestoreData(prev)) !== JSON.stringify(cleanFirestoreData(next))) {
+      enqueueWrite('categories', next.id, 'set', next);
     }
-  } catch (err) {
-    console.error('Error syncing categories diff to Firestore:', err);
-    try {
-      handleFirestoreError(err, OperationType.WRITE, 'categories');
-    } catch {}
   }
 }
 
 /**
  * Granular sync helpers: when an admin creates, updates, or deletes artifacts
+ * Uses write coalescing: deletes superseded updates from history.
  */
 export async function syncArtifactsDiff(oldList: Artifact[], newList: Artifact[]): Promise<void> {
-  try {
-    const newIds = new Set(newList.map((a) => a.id));
-    // Find deleted
-    for (const old of oldList) {
-      if (!newIds.has(old.id)) {
-        await deleteDoc(doc(db, 'artifacts', old.id));
-      }
+  const oldMap = new Map(oldList.map((a) => [a.id, a]));
+  const newIds = new Set(newList.map((a) => a.id));
+
+  // Find deleted
+  for (const old of oldList) {
+    if (!newIds.has(old.id)) {
+      enqueueWrite('artifacts', old.id, 'delete');
     }
-    // Find added or modified
-    for (const next of newList) {
-      await setDoc(doc(db, 'artifacts', next.id), cleanFirestoreData(next));
+  }
+  // Find added or modified ONLY
+  for (const next of newList) {
+    const prev = oldMap.get(next.id);
+    if (!prev || JSON.stringify(cleanFirestoreData(prev)) !== JSON.stringify(cleanFirestoreData(next))) {
+      enqueueWrite('artifacts', next.id, 'set', next);
     }
-  } catch (err) {
-    console.error('Error syncing artifacts diff to Firestore:', err);
-    try {
-      handleFirestoreError(err, OperationType.WRITE, 'artifacts');
-    } catch {}
   }
 }
 
 /**
  * Granular sync helpers: when an admin creates, updates, or deletes questions
+ * Uses write coalescing: deletes superseded updates from history.
  */
 export async function syncQuestionsDiff(oldList: QuizQuestion[], newList: QuizQuestion[]): Promise<void> {
-  try {
-    const newIds = new Set(newList.map((q) => q.id));
-    // Find deleted
-    for (const old of oldList) {
-      if (!newIds.has(old.id)) {
-        await deleteDoc(doc(db, 'questions', old.id));
-      }
+  const oldMap = new Map(oldList.map((q) => [q.id, q]));
+  const newIds = new Set(newList.map((q) => q.id));
+
+  // Find deleted
+  for (const old of oldList) {
+    if (!newIds.has(old.id)) {
+      enqueueWrite('questions', old.id, 'delete');
     }
-    // Find added or modified
-    for (const next of newList) {
-      await setDoc(doc(db, 'questions', next.id), cleanFirestoreData(next));
+  }
+  // Find added or modified ONLY
+  for (const next of newList) {
+    const prev = oldMap.get(next.id);
+    if (!prev || JSON.stringify(cleanFirestoreData(prev)) !== JSON.stringify(cleanFirestoreData(next))) {
+      enqueueWrite('questions', next.id, 'set', next);
     }
-  } catch (err) {
-    console.error('Error syncing questions diff to Firestore:', err);
-    try {
-      handleFirestoreError(err, OperationType.WRITE, 'questions');
-    } catch {}
   }
 }
 
@@ -425,14 +755,7 @@ export async function syncQuestionsDiff(oldList: QuizQuestion[], newList: QuizQu
  * Granular sync helpers: when an admin updates About Content
  */
 export async function syncAboutContentToFirestore(about: AboutContent): Promise<void> {
-  try {
-    await setDoc(doc(db, 'config', 'about'), cleanFirestoreData({ ...about, id: 'about' }));
-  } catch (err) {
-    console.error('Error syncing about to Firestore:', err);
-    try {
-      handleFirestoreError(err, OperationType.WRITE, 'config/about');
-    } catch {}
-  }
+  enqueueWrite('config', 'about', 'set', { ...about, id: 'about' });
 }
 
 /**
@@ -445,8 +768,12 @@ export async function resetFirestoreToDefaults(
   defaultQuestions: QuizQuestion[],
   defaultAbout: AboutContent
 ): Promise<void> {
+  if (isFirestoreQuotaExhausted()) {
+    console.warn('[Firestore] Reset cloud skipped: daily write quota reached.');
+    return;
+  }
+
   try {
-    // Delete existing documents
     const [slidesSnap, catSnap, artSnap, qSnap] = await Promise.all([
       getDocs(collection(db, 'slides')),
       getDocs(collection(db, 'categories')),
@@ -459,9 +786,12 @@ export async function resetFirestoreToDefaults(
     for (const d of artSnap.docs) await deleteDoc(d.ref);
     for (const d of qSnap.docs) await deleteDoc(d.ref);
 
-    // Re-seed defaults
     await syncAllToFirestore(defaultSlides, defaultCategories, defaultArtifacts, defaultQuestions, defaultAbout);
   } catch (err) {
+    if (checkAndMarkQuotaExhausted(err)) {
+      console.warn('[Firestore] Reset cloud paused: daily write quota reached.');
+      return;
+    }
     console.error('Error resetting Firestore to defaults:', err);
     try {
       handleFirestoreError(err, OperationType.WRITE, 'reset');
