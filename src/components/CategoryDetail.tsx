@@ -9,6 +9,7 @@ interface CategoryDetailProps {
   hasDeclinedArtifacts?: boolean;
   onOpenArtifacts: () => void;
   onOpenQuestions: () => void;
+  onOpenThenAndNow?: () => void;
   onUpdateCategoryBanner?: (catId: string, bannerUrl: string) => void;
 }
 
@@ -18,6 +19,7 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
   hasDeclinedArtifacts = false,
   onOpenArtifacts,
   onOpenQuestions,
+  onOpenThenAndNow,
   onUpdateCategoryBanner,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -247,6 +249,40 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
                 Questions
               </span>
             </button>
+
+            {/* 3. Then & Now Icon: Overlapping arrows (top pink pointing left, bottom blue pointing right) */}
+            {onOpenThenAndNow && (
+              <button
+                onClick={onOpenThenAndNow}
+                className="flex flex-col items-center group cursor-pointer transition-transform hover:scale-105 active:scale-95 text-center"
+                title="Open Then & Now"
+              >
+                {/* Stylized Two Arrows Graphic matching reference image: Top Pink Arrow Left, Bottom Blue Arrow Right */}
+                <div className="w-18 h-14 sm:w-20 sm:h-16 relative flex items-center justify-center filter drop-shadow-sm group-hover:drop-shadow-md">
+                  <svg viewBox="0 0 80 64" className="w-full h-full">
+                    {/* Top Pink Arrow pointing Left */}
+                    <path
+                      d="M 34 11 L 12 25 L 34 39 L 34 32 L 68 32 L 68 18 L 34 18 Z"
+                      fill="#FF70A6"
+                      stroke="#000000"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                    />
+                    {/* Bottom Blue Arrow pointing Right */}
+                    <path
+                      d="M 46 53 L 68 39 L 46 25 L 46 32 L 12 32 L 12 46 L 46 46 Z"
+                      fill="#38BDF8"
+                      stroke="#000000"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <span className="font-bebas text-xl sm:text-2xl text-black tracking-wider mt-2 group-hover:text-cyan-600 transition-colors">
+                  Then & Now
+                </span>
+              </button>
+            )}
           </div>
         </div>
 

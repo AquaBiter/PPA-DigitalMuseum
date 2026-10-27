@@ -19,6 +19,7 @@ import { CategoryDetail } from './components/CategoryDetail';
 import { ArtifactView } from './components/ArtifactView';
 import { QuestionView } from './components/QuestionView';
 import { AboutView } from './components/AboutView';
+import { ThenAndNowView } from './components/ThenAndNowView';
 import { AdminModal } from './components/AdminModal';
 import { SearchDropdown } from './components/SearchDropdown';
 import { DeviceOrientationGuard } from './components/DeviceOrientationGuard';
@@ -80,13 +81,33 @@ const sanitizeSlides = (rawSlides: Slide[]): Slide[] =>
     return s;
   });
 
-// Helper to sanitize any legacy "ex." prefix from persisted localStorage data
+// Helper to detect and upgrade legacy placeholder reference links
+const isLegacyReferenceLink = (url: string): boolean => {
+  return (
+    url.includes('wikipedia.org') ||
+    url.includes('nhcp.gov.ph') ||
+    url.includes('bsp.gov.ph') ||
+    url === 'https://psa.gov.ph' ||
+    url.includes('inquirer.net') ||
+    url.includes('opm.org.ph') ||
+    url.includes('filipiknow.net') ||
+    url.includes('bagong.pagasa.dost.gov.ph') ||
+    url === 'https://denr.gov.ph' ||
+    url.includes('deseret.com')
+  );
+};
+
+// Helper to sanitize categories and apply latest official support sources links
 const sanitizeCategories = (cats: Category[]): Category[] =>
   cats.map((c) => {
     const initialMatch = INITIAL_CATEGORIES.find((ic) => ic.id === c.id);
-    const referenceLinks = Array.isArray(c.referenceLinks)
-      ? c.referenceLinks
-      : (initialMatch?.referenceLinks || []);
+    let referenceLinks = Array.isArray(c.referenceLinks) ? c.referenceLinks : (initialMatch?.referenceLinks || []);
+
+    // If category has no links or contains legacy links, upgrade to the updated official sources
+    if (referenceLinks.length === 0 || referenceLinks.some((l) => isLegacyReferenceLink(l.url))) {
+      referenceLinks = initialMatch?.referenceLinks || referenceLinks;
+    }
+
     const bannerImageUrl =
       c.bannerImageUrl && c.bannerImageUrl.startsWith('data:') && c.bannerImageUrl.length > 780000
         ? undefined
@@ -139,18 +160,74 @@ const sanitizeArtifacts = (arts: Artifact[]): Artifact[] =>
     };
   });
 
-const sanitizeQuestions = (qs: QuizQuestion[]): QuizQuestion[] =>
-  qs.map((q) => {
-    const imageUrl =
-      q.imageUrl && q.imageUrl.startsWith('data:') && q.imageUrl.length > 780000
-        ? undefined
-        : q.imageUrl;
+export const LEGACY_DEFAULT_ARTIFACT_IDS = new Set([
+  'nokia-phones',
+  'friendster-internet-cafe',
+  'edsa-dos',
+  'hello-garci-scandal',
+  'bpo-boom',
+  'opm-bands',
+  'anime-fever-tv',
+  'typhoon-ondoy',
+]);
+
+export const sanitizeAndUpgradeArtifacts = (arts: Artifact[]): Artifact[] => {
+  const sanitized = sanitizeArtifacts(arts);
+
+  // Filter out any old legacy placeholder artifacts
+  const withoutLegacy = sanitized.filter((a) => !LEGACY_DEFAULT_ARTIFACT_IDS.has(a.id));
+
+  // Merge with the official INITIAL_ARTIFACTS
+  const combined = [...INITIAL_ARTIFACTS];
+  withoutLegacy.forEach((customA) => {
+    if (!combined.some((a) => a.id === customA.id)) {
+      combined.push(customA);
+    }
+  });
+
+  return combined;
+};
+
+export const LEGACY_DEFAULT_QUESTION_IDS = new Set([
+  'q-social-nokia',
+  'q-political-edsa',
+  'q-cultural-music',
+  'q-economic-bpo',
+  'q-environmental-ondoy',
+]);
+
+export const sanitizeAndUpgradeQuestions = (qs: QuizQuestion[]): QuizQuestion[] => {
+  const sanitized = qs.map((q) => {
+    let imageUrl = q.imageUrl;
+    // Strip large or legacy Nokia phone data URLs from question images so they use the topic's banner graphic
+    if (
+      imageUrl &&
+      ((imageUrl.startsWith('data:') && imageUrl.length > 780000) ||
+        imageUrl.includes('phone1Body') ||
+        imageUrl.includes('nokiaGreenScreen'))
+    ) {
+      imageUrl = undefined;
+    }
     return {
       ...q,
       imageUrl,
       questionText: q.questionText.replace(/^(ex\.|ex)\s*/i, ''),
     };
   });
+
+  // Filter out any of the old legacy placeholder questions
+  const withoutLegacy = sanitized.filter((q) => !LEGACY_DEFAULT_QUESTION_IDS.has(q.id));
+
+  // Merge with the official 10 INITIAL_QUESTIONS
+  const combined = [...INITIAL_QUESTIONS];
+  withoutLegacy.forEach((customQ) => {
+    if (!combined.some((q) => q.id === customQ.id)) {
+      combined.push(customQ);
+    }
+  });
+
+  return combined;
+};
 
 export default function App() {
   // Persistent state in localStorage
@@ -176,17 +253,11 @@ export default function App() {
     try {
       const saved = localStorage.getItem('ppa_artifacts');
       if (saved) {
-        const parsed: Artifact[] = sanitizeArtifacts(JSON.parse(saved));
-        INITIAL_ARTIFACTS.forEach((initArt) => {
-          if (!parsed.some((a) => a.id === initArt.id)) {
-            parsed.push(initArt);
-          }
-        });
-        return parsed;
+        return sanitizeAndUpgradeArtifacts(JSON.parse(saved));
       }
-      return sanitizeArtifacts(INITIAL_ARTIFACTS);
+      return sanitizeAndUpgradeArtifacts(INITIAL_ARTIFACTS);
     } catch {
-      return sanitizeArtifacts(INITIAL_ARTIFACTS);
+      return sanitizeAndUpgradeArtifacts(INITIAL_ARTIFACTS);
     }
   });
 
@@ -194,18 +265,11 @@ export default function App() {
     try {
       const saved = localStorage.getItem('ppa_questions');
       if (saved) {
-        const parsed: QuizQuestion[] = sanitizeQuestions(JSON.parse(saved));
-        // Ensure any newly added initial questions are merged if a category has none
-        INITIAL_QUESTIONS.forEach((initQ) => {
-          if (!parsed.some((q) => q.categoryId === initQ.categoryId)) {
-            parsed.push(initQ);
-          }
-        });
-        return parsed;
+        return sanitizeAndUpgradeQuestions(JSON.parse(saved));
       }
-      return sanitizeQuestions(INITIAL_QUESTIONS);
+      return sanitizeAndUpgradeQuestions(INITIAL_QUESTIONS);
     } catch {
-      return sanitizeQuestions(INITIAL_QUESTIONS);
+      return sanitizeAndUpgradeQuestions(INITIAL_QUESTIONS);
     }
   });
 
@@ -278,7 +342,7 @@ export default function App() {
     categories.find((c) => c.id === 'social') || categories[0]
   );
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact>(
-    artifacts.find((a) => a.id === 'nokia-phones') || artifacts[0]
+    artifacts.find((a) => a.id === 'soc-nokia-texting') || artifacts[0]
   );
   const [selectedQuestion, setSelectedQuestion] = useState<QuizQuestion>(
     questions.find((q) => q.categoryId === 'social') || questions[0]
@@ -367,8 +431,8 @@ export default function App() {
         await seedArchiveIfEmpty(
           INITIAL_SLIDES,
           sanitizeCategories(INITIAL_CATEGORIES),
-          sanitizeArtifacts(INITIAL_ARTIFACTS),
-          sanitizeQuestions(INITIAL_QUESTIONS),
+          sanitizeAndUpgradeArtifacts(INITIAL_ARTIFACTS),
+          sanitizeAndUpgradeQuestions(INITIAL_QUESTIONS),
           INITIAL_ABOUT_CONTENT
         );
       }
@@ -392,13 +456,39 @@ export default function App() {
       onArtifacts: (cloudArtifacts) => {
         if (!isSubscribed) return;
         if (cloudArtifacts && cloudArtifacts.length > 0) {
-          setArtifacts(sanitizeArtifacts(cloudArtifacts));
+          const upgraded = sanitizeAndUpgradeArtifacts(cloudArtifacts);
+          setArtifacts(upgraded);
+          // If Firestore still held any old legacy artifact IDs, old Nokia SVG image, or outdated notes, sync the upgraded artifacts to cloud
+          const isCloudOutdated = cloudArtifacts.some(
+            (a) =>
+              LEGACY_DEFAULT_ARTIFACT_IDS.has(a.id) ||
+              (a.id === 'soc-nokia-texting' && !a.imageUrl?.includes('hqdefault.jpg')) ||
+              (a.id === 'cult-anime' &&
+                (a.videoUrl?.includes('zZ_JvvXuFuA') ||
+                  a.videos?.some((v) => v.url.includes('zZ_JvvXuFuA')))) ||
+              INITIAL_ARTIFACTS.some((initA) => initA.id === a.id && initA.notes !== a.notes)
+          );
+          if (isCloudOutdated) {
+            syncArtifactsDiff(cloudArtifacts, upgraded);
+          }
         }
       },
       onQuestions: (cloudQuestions) => {
         if (!isSubscribed) return;
         if (cloudQuestions && cloudQuestions.length > 0) {
-          setQuestions(sanitizeQuestions(cloudQuestions));
+          const upgraded = sanitizeAndUpgradeQuestions(cloudQuestions);
+          setQuestions(upgraded);
+          // If Firestore still held any old legacy question IDs or questions with legacy Nokia image, sync upgraded questions
+          if (
+            cloudQuestions.some(
+              (q) =>
+                LEGACY_DEFAULT_QUESTION_IDS.has(q.id) ||
+                (q.imageUrl &&
+                  (q.imageUrl.includes('phone1Body') || q.imageUrl.includes('nokiaGreenScreen')))
+            )
+          ) {
+            syncQuestionsDiff(cloudQuestions, upgraded);
+          }
         }
       },
       onAbout: (cloudAbout) => {
@@ -437,7 +527,7 @@ export default function App() {
         setShowQuizPrompt(true);
         setHasOpenedArtifacts(false);
       }
-    } else if (currentView === 'questions') {
+    } else if (currentView === 'questions' || currentView === 'then-and-now') {
       setCurrentView('category');
     } else if (currentView === 'category') {
       setCurrentView('home');
@@ -529,8 +619,8 @@ export default function App() {
 
   const handleResetDefaults = () => {
     const cleanCats = sanitizeCategories(INITIAL_CATEGORIES);
-    const cleanArts = sanitizeArtifacts(INITIAL_ARTIFACTS);
-    const cleanQs = sanitizeQuestions(INITIAL_QUESTIONS);
+    const cleanArts = sanitizeAndUpgradeArtifacts(INITIAL_ARTIFACTS);
+    const cleanQs = sanitizeAndUpgradeQuestions(INITIAL_QUESTIONS);
 
     setSlides(INITIAL_SLIDES);
     setCategories(cleanCats);
@@ -538,7 +628,7 @@ export default function App() {
     setQuestions(cleanQs);
     setAboutContent(INITIAL_ABOUT_CONTENT);
     setSelectedCategory(cleanCats.find((c) => c.id === 'social') || cleanCats[0]);
-    setSelectedArtifact(cleanArts.find((a) => a.id === 'nokia-phones') || cleanArts[0]);
+    setSelectedArtifact(cleanArts.find((a) => a.id === 'soc-nokia-texting') || cleanArts[0]);
     safeLocalStorageRemove('ppa_slides');
     safeLocalStorageRemove('ppa_categories');
     safeLocalStorageRemove('ppa_artifacts');
@@ -628,6 +718,7 @@ export default function App() {
                 navigateTo('artifacts');
               }}
               onOpenQuestions={() => navigateTo('questions')}
+              onOpenThenAndNow={() => navigateTo('then-and-now')}
               onUpdateCategoryBanner={(catId, bannerUrl) => {
                 const updated = categories.map((c) =>
                   c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
@@ -670,10 +761,20 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 5: About Page Modal / Screen */}
+          {/* VIEW 5: Then & Now Comparison View */}
+          {currentView === 'then-and-now' && (
+            <ThenAndNowView
+              category={selectedCategory}
+              categories={categories}
+              onSelectCategory={(cat) => setSelectedCategory(cat)}
+              onBackToTopic={() => navigateTo('category')}
+            />
+          )}
+
+          {/* VIEW 6: About Page Modal / Screen */}
           {currentView === 'about' && <AboutView content={aboutContent} />}
 
-          {/* VIEW 6: Admin Settings & Management System */}
+          {/* VIEW 7: Admin Settings & Management System */}
           {currentView === 'admin' && (
             <AdminModal
               slides={slides}

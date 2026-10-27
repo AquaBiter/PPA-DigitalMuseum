@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { RotateCcw, CheckCircle2, AlertCircle, HelpCircle, ArrowRight, Camera, Lock, Check, Volume2, VolumeX } from 'lucide-react';
 import { QuizQuestion, Artifact, Category } from '../types';
+import { DEFAULT_CATEGORY_BANNER_SVG } from '../data/initialData';
 import { playInteractionSound, toggleQuizMusicMute, getIsQuizMuted } from '../utils/audioManager';
 import { compressImageFile } from '../utils/imageCompressor';
 
@@ -148,7 +149,7 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
   const isCorrect = selectedChoiceId === question.correctChoiceId;
   const cleanQuestionText = question.questionText.replace(/^(ex\.|ex)\s*/i, '');
   const currentIndex = availableQuestions.findIndex((q) => q.id === question.id);
-  const displayImageUrl = question.imageUrl || artifact?.imageUrl;
+  const displayImageUrl = question.imageUrl || category.bannerImageUrl || DEFAULT_CATEGORY_BANNER_SVG;
 
   // Question progression check: A question is unlocked ONLY IF all previous questions are passed
   const isQuestionUnlocked = (idx: number) => {
@@ -266,7 +267,7 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
             {displayImageUrl ? (
               <img
                 src={displayImageUrl}
-                alt={artifact?.title ? artifact.title.replace(/^(ex\.|ex)\s*/i, '') : 'Archive Item'}
+                alt={`${category.name} Archive Banner Graphic`}
                 className="max-w-full max-h-[440px] w-auto h-auto object-contain rounded-lg shadow-inner"
               />
             ) : (
@@ -274,11 +275,9 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
             )}
           </div>
 
-          {artifact && (
-            <p className="text-center font-bebas text-lg text-zinc-600 tracking-wider mt-2">
-              {artifact.title.replace(/^(ex\.|ex)\s*/i, '')}
-            </p>
-          )}
+          <p className="text-center font-bebas text-lg text-zinc-600 tracking-wider mt-2">
+            {category.name} ARCHIVE BANNER GRAPHIC
+          </p>
 
           {/* Change Reference Image Option - STRICTLY ADMIN ONLY */}
           {isAdmin && onUpdateQuestion && (

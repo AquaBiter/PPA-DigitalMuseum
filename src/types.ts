@@ -73,4 +73,4 @@ export interface AboutContent {
   milestones: TimelineMilestone[];
 }
 
-export type ViewMode = 'home' | 'category' | 'artifacts' | 'questions' | 'about' | 'admin';
+export type ViewMode = 'home' | 'category' | 'artifacts' | 'questions' | 'about' | 'admin' | 'then-and-now';

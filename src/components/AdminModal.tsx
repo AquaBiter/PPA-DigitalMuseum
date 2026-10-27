@@ -38,6 +38,7 @@ import {
 } from '../types';
 import { formatToYouTubeEmbed, parseMultipleYouTubeUrls, extractYouTubeId } from '../utils/youtube';
 import { compressImageFile } from '../utils/imageCompressor';
+import { DEFAULT_CATEGORY_BANNER_SVG } from '../data/initialData';
 import { pruneStorageHistory, forceRetrySync, getPendingOutbox } from '../firebase';
 
 interface AdminModalProps {
@@ -1485,7 +1486,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     {/* Reference Image for this Question */}
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-500 mb-1">
-                        Reference Image (Non-cropped)
+                        Topic Banner Graphic / Reference Image
                       </label>
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <button
@@ -1505,23 +1506,27 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                   item.id === q.id ? { ...item, imageUrl: undefined } : item
                                 )
                               );
-                              showToast('Reset question to default artifact image');
+                              showToast('Reset question to topic banner graphic');
                             }}
                             className="text-xs text-red-600 hover:underline cursor-pointer"
                           >
-                            Reset to Artifact Image
+                            Reset to Topic Banner Graphic
                           </button>
                         )}
                       </div>
-                      {(q.imageUrl || artifacts.find((a) => a.id === q.artifactId)?.imageUrl) && (
-                        <div className="w-full h-28 rounded-lg overflow-hidden border border-zinc-200 bg-zinc-950/5 p-2 flex items-center justify-center">
-                          <img
-                            src={q.imageUrl || artifacts.find((a) => a.id === q.artifactId)?.imageUrl}
-                            alt="Reference"
-                            className="max-h-full max-w-full object-contain rounded"
-                          />
-                        </div>
-                      )}
+                      {(() => {
+                        const qCat = categories.find((c) => c.id === q.categoryId);
+                        const bannerImg = q.imageUrl || qCat?.bannerImageUrl || DEFAULT_CATEGORY_BANNER_SVG;
+                        return (
+                          <div className="w-full h-28 rounded-lg overflow-hidden border border-zinc-200 bg-zinc-950/5 p-2 flex items-center justify-center">
+                            <img
+                              src={bannerImg}
+                              alt="Topic Banner Reference"
+                              className="max-h-full max-w-full object-contain rounded"
+                            />
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

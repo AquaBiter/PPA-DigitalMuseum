@@ -41,13 +41,13 @@ export const INITIAL_CATEGORIES: Category[] = [
     referenceLinks: [
       {
         id: 'ref-pol-1',
-        url: 'https://en.wikipedia.org/wiki/EDSA_II',
-        title: 'EDSA People Power II Archive & Chronology',
+        title: 'Revolutionary Text: Social Psychology of Cellphone Texting during People Power II',
+        url: 'https://www.ejournals.ph/article.php?id=4015',
       },
       {
         id: 'ref-pol-2',
-        url: 'https://nhcp.gov.ph',
-        title: 'National Historical Commission of the Philippines (NHCP)',
+        title: 'The Cell Phone and the Crowd: Messianic Politics in the Contemporary Philippines',
+        url: 'https://escholarship.org/uc/item/5t1376v0',
       },
     ],
   },
@@ -60,13 +60,13 @@ export const INITIAL_CATEGORIES: Category[] = [
     referenceLinks: [
       {
         id: 'ref-econ-1',
-        url: 'https://www.bsp.gov.ph',
-        title: 'Bangko Sentral ng Pilipinas - Historical Economic Statistics (2000-2010)',
+        title: '2000 Survey of Overseas Filipinos',
+        url: 'https://psa.gov.ph/content/2000-survey-overseas-filipinos-sof',
       },
       {
         id: 'ref-econ-2',
-        url: 'https://psa.gov.ph',
-        title: 'Philippine Statistics Authority - OFW & Consumer Surveys',
+        title: 'Filipino Entrepreneurs on the Internet: When Social Networking Websites Meet Mobile Commerce',
+        url: 'https://journals.sagepub.com/doi/10.1177/097172180801300203',
       },
     ],
   },
@@ -79,13 +79,13 @@ export const INITIAL_CATEGORIES: Category[] = [
     referenceLinks: [
       {
         id: 'ref-soc-1',
-        url: 'https://en.wikipedia.org/wiki/Nokia_3310',
-        title: 'Nokia 3310 & Philippine SMS Culture in the 2000s',
+        title: 'Revolutionary Text: Social Psychology of Cellphone Texting during People Power II',
+        url: 'https://www.ejournals.ph/article.php?id=4015',
       },
       {
         id: 'ref-soc-2',
-        url: 'https://www.inquirer.net',
-        title: 'Philippine Daily Inquirer Digital Archives (2000-2010 Life & Trends)',
+        title: 'Entertainment publics in the Philippines',
+        url: 'https://journals.sagepub.com/doi/10.1177/1329878X20985960',
       },
     ],
   },
@@ -98,13 +98,13 @@ export const INITIAL_CATEGORIES: Category[] = [
     referenceLinks: [
       {
         id: 'ref-cult-1',
-        url: 'https://opm.org.ph',
-        title: 'Organisasyon ng mga Pilipinong Mang-aawit (OPM) History & Boom',
+        title: 'Modes of Resistance in a Globalizing Popular Culture Industry',
+        url: 'https://scispace.com/pdf/modes-of-resistance-in-a-globalizing-popular-culture-46q0pc3j5v.pdf',
       },
       {
         id: 'ref-cult-2',
-        url: 'https://filipiknow.net',
-        title: 'Retro Pinoy Pop Culture & 2000s Nostalgia Archives',
+        title: 'Entertainment publics in the Philippines',
+        url: 'https://journals.sagepub.com/doi/10.1177/1329878X20985960',
       },
     ],
   },
@@ -117,17 +117,59 @@ export const INITIAL_CATEGORIES: Category[] = [
     referenceLinks: [
       {
         id: 'ref-env-1',
-        url: 'https://bagong.pagasa.dost.gov.ph',
-        title: 'DOST-PAGASA Historical Weather & Tropical Cyclone Records',
+        title: 'Philippines Environment Monitor 2001',
+        url: 'https://serp-p.pids.gov.ph/publication/public/view?slug=philippines-environment-monitor-2001',
       },
       {
         id: 'ref-env-2',
-        url: 'https://denr.gov.ph',
-        title: 'Department of Environment and Natural Resources (DENR) Archive',
+        title: 'Handbook on Ecological Solid Waste Management Act of 2000 and Its Implementing Rules and Regulations',
+        url: 'https://faspselib.denr.gov.ph/Materials/Detail/66452379-bf37-4bf6-9682-e4b981aebfa5',
       },
     ],
   },
 ];
+
+// Default category banner graphic illustration (rolling hills, sky and clouds) matching CategoryDetail
+export const DEFAULT_CATEGORY_BANNER_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#BAE6FD" />
+      <stop offset="70%" stop-color="#E0F2FE" />
+      <stop offset="100%" stop-color="#F0F9FF" />
+    </linearGradient>
+    <linearGradient id="hillGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#A3E635" />
+      <stop offset="100%" stop-color="#65A30D" />
+    </linearGradient>
+    <linearGradient id="hillGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#BEF264" />
+      <stop offset="100%" stop-color="#84CC16" />
+    </linearGradient>
+    <linearGradient id="hillGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#65A30D" />
+      <stop offset="100%" stop-color="#4D7C0F" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" fill="url(#skyGrad)" />
+  <g fill="#FFFFFF" opacity="0.95" transform="translate(40, 80)">
+    <ellipse cx="60" cy="40" rx="40" ry="22" />
+    <ellipse cx="40" cy="45" rx="25" ry="18" />
+    <ellipse cx="85" cy="45" rx="30" ry="18" />
+    <rect x="25" y="45" width="85" height="18" rx="8" />
+  </g>
+  <g fill="#FFFFFF" opacity="0.98" transform="translate(240, 60)">
+    <ellipse cx="90" cy="45" rx="55" ry="32" />
+    <ellipse cx="50" cy="55" rx="35" ry="22" />
+    <ellipse cx="130" cy="55" rx="40" ry="22" />
+    <rect x="30" y="55" width="130" height="22" rx="10" />
+  </g>
+  <path d="M 45 170 Q 48 166 52 170 Q 56 166 60 170" fill="none" stroke="#64748B" stroke-width="1.2" />
+  <path d="M 0 240 Q 150 180 340 240 Q 480 280 600 220 L 600 360 L 0 360 Z" fill="url(#hillGrad1)" />
+  <path d="M 0 270 Q 180 210 380 260 Q 520 290 600 240 L 600 360 L 0 360 Z" fill="url(#hillGrad2)" opacity="0.9" />
+  <path d="M 0 240 Q 120 310 240 270 Q 360 220 600 300 L 600 360 L 0 360 Z" fill="url(#hillGrad3)" />
+</svg>
+`)}`;
 
 // High quality embedded retro Nokia phone image as an SVG data URI
 export const NOKIA_PHONES_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -285,209 +327,412 @@ export const NOKIA_PHONES_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`
 `)}`;
 
 export const INITIAL_ARTIFACTS: Artifact[] = [
+  // 1. Cultural Archive
   {
-    id: 'nokia-phones',
-    categoryId: 'social',
-    title: 'NOKIA PHONES',
-    description: 'This archive explores the everyday social life of Filipinos from 2000 to 2010, including communication, friendships, family connections, gadgets, social spaces, and early online communities. It shows how technologies such as mobile phones, texting, and the Internet changed how people interacted with each other.',
-    notes: 'The phone represents the early stage of mobile communication before smartphones became common.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE', // Classic 2000s tech commercial or demonstration
-    videoTitle: '2000s Mobile Tech & Texting Culture in the Philippines',
+    id: 'cult-anime',
+    categoryId: 'cultural',
+    title: 'Anime in Filipino Popular Culture',
+    description:
+      'Anime became a recognizable part of Filipino entertainment through television broadcasts and Filipino-dubbed shows. Japanese animated series introduced viewers to different characters, stories, and art styles. These shows became part of the childhood memories of many Filipinos and helped build interest in Japanese popular culture.',
+    notes:
+      'Voltes V helped popularize Japanese anime among Filipino viewers, influencing childhood entertainment during the 2000s.',
+    imageUrl: 'https://img.youtube.com/vi/0rcNkcSgbHU/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/0rcNkcSgbHU',
+    videoTitle: 'Anime in Filipino Popular Culture',
     videos: [
       {
-        id: 'vid-nokia-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: '2000s Mobile Tech & Texting Culture in the Philippines',
-      },
-      {
-        id: 'vid-nokia-2',
-        url: 'https://www.youtube.com/embed/Q4Xky3t8YmQ',
-        title: 'Nokia 3310 & 3210 Nostalgia Retrospective',
+        id: 'vid-cult-anime-1',
+        url: 'https://www.youtube.com/embed/0rcNkcSgbHU',
+        title: 'Anime in Filipino Popular Culture',
       },
     ],
   },
   {
-    id: 'friendster-internet-cafe',
-    categoryId: 'social',
-    title: 'FRIENDSTER & INTERNET CAFES (2002–2008)',
-    description: 'Before Facebook, Friendster was the dominant social network in the Philippines, with millions customizing their profiles with CSS glitter graphics and background songs. Neighborhood Internet cafes (P20 per hour) became the primary youth social hangout for online gaming like Ragnarok Online and chatting on Yahoo Messenger.',
-    notes: 'Friendster testimonials and profile views were the ultimate social currency among Filipino youth.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: '2000s Internet Cafe & Friendster Phenomenon',
+    id: 'cult-opm-rock',
+    categoryId: 'cultural',
+    title: 'OPM and Filipino Rock Music',
+    description:
+      'Original Pilipino Music (OPM) played an important role in Filipino popular culture during the 2000s. Filipino bands and singers connected with listeners through songs about love, friendship, personal experiences, and everyday life. Concerts and music programs also helped artists maintain their connection with fans.',
+    notes:
+      "The Eraserheads' 2008 reunion concert showed the lasting popularity of Filipino rock music across generations.",
+    imageUrl: 'https://img.youtube.com/vi/WAvJvAOAkDM/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/WAvJvAOAkDM',
+    videoTitle: 'Eraserheads Reunion Concert',
     videos: [
       {
-        id: 'vid-friendster-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: '2000s Internet Cafe & Friendster Phenomenon',
+        id: 'vid-cult-opm-1',
+        url: 'https://www.youtube.com/embed/WAvJvAOAkDM',
+        title: 'Eraserheads Reunion Concert',
       },
     ],
   },
   {
-    id: 'edsa-dos',
-    categoryId: 'political',
-    title: 'EDSA DOS & SMS MOBILIZATION',
-    description: 'In January 2001, mass demonstrations gathered at the EDSA Shrine, heavily coordinated through viral SMS forward messages reading "Go 2 EDSA, Wear blk". This demonstrated how early mobile technology could alter political history.',
-    notes: 'Considered one of the earliest mobile phone-driven political uprisings in the world.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: 'EDSA II SMS Revolution Documentary',
+    id: 'cult-teleseryes',
+    categoryId: 'cultural',
+    title: 'Philippine Television Dramas',
+    description:
+      'Television dramas, commonly called teleseryes, were an important form of entertainment for Filipino audiences. Their stories often focused on family relationships, romance, conflict, and personal struggles. These programs also influenced conversations and shared viewing experiences at home.',
+    notes:
+      'The original Pangako Sa ’Yo (2000–2002) became a popular teleserye featuring romance, family, and personal struggles.',
+    imageUrl: 'https://img.youtube.com/vi/azqFrHlpDOE/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/azqFrHlpDOE',
+    videoTitle: 'Pangako Sa ’Yo Marathon Part 1',
     videos: [
       {
-        id: 'vid-edsa-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: 'EDSA II SMS Revolution Documentary',
+        id: 'vid-cult-tele-1',
+        url: 'https://www.youtube.com/embed/azqFrHlpDOE',
+        title: 'Pangako Sa ’Yo Marathon Part 1',
       },
     ],
   },
+
+  // 2. Economic Archive
   {
-    id: 'hello-garci-scandal',
-    categoryId: 'political',
-    title: 'HELLO GARCI & SATIRE RINGTONES (2005)',
-    description: 'In 2005, wiretapped audio from the 2004 presidential elections leaked to the public. Audio clips of the conversation quickly turned into viral mobile ringtones and remixes, transforming national political controversy into grassroots popular satire.',
-    notes: 'Exemplified how mobile ringtones became a medium for political commentary and humor.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: '2005 Political Wiretaps & Media Satire Archive',
-    videos: [
-      {
-        id: 'vid-garci-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: '2005 Political Wiretaps & Media Satire Archive',
-      },
-    ],
-  },
-  {
-    id: 'bpo-boom',
+    id: 'econ-sari-sari',
     categoryId: 'economic',
-    title: 'THE CALL CENTER BOOM & 24/7 ECONOMY',
-    description: 'During the 2000s, Eastwood City, Ortigas, and Makati transformed into 24-hour economic hubs. The BPO sector provided hundreds of thousands of jobs and spawned late-night dining and coffee culture across metro hubs.',
-    notes: 'The economic expansion created a new middle class and revolutionized graveyard-shift commerce.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: 'Rise of BPO and 2000s Philippine Commerce',
+    title: 'Sari-Sari Stores',
+    description:
+      'Sari-sari stores have long served as small neighborhood businesses in the Philippines. They sell everyday products in small quantities, making basic goods more accessible to nearby residents. These stores also provide income for families and support local economic activity.',
+    notes:
+      'Sari-sari stores support family income by selling affordable everyday goods to local communities.',
+    imageUrl: 'https://img.youtube.com/vi/oRi_ipjlEoU/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/oRi_ipjlEoU',
+    videoTitle: 'Sari-Sari Store Example',
     videos: [
       {
-        id: 'vid-bpo-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: 'Rise of BPO and 2000s Philippine Commerce',
+        id: 'vid-econ-sari-1',
+        url: 'https://www.youtube.com/embed/oRi_ipjlEoU',
+        title: 'Sari-Sari Store Example',
       },
     ],
   },
   {
-    id: 'opm-bands',
-    categoryId: 'cultural',
-    title: 'OPM BAND INVASION & MYX COUNTDOWN',
-    description: 'The 2000s was a golden era for Pinoy rock and pop. Bands like Parokya ni Edgar, Kamikazee, Sponge Cola, Bamboo, and Hale dominated radio charts and the MYX Daily Top 10 countdowns.',
-    notes: 'Physical CDs, cassette tapes, and pirated MP3s shaped how youth shared and experienced songs.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: '2000s OPM Band Era Highlights',
+    id: 'econ-bpo',
+    categoryId: 'economic',
+    title: 'Call Centers and the BPO Industry',
+    description:
+      "The business process outsourcing (BPO) industry became an important source of employment in the Philippines during the 2000s. Call centers provided jobs that involved customer service and communication with international clients. The industry's growth was connected to globalization and improvements in communication technology.",
+    notes:
+      'The growing BPO industry in the 2000s created jobs for Filipinos serving international businesses.',
+    imageUrl: 'https://img.youtube.com/vi/d8hBJN9iVZw/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/d8hBJN9iVZw',
+    videoTitle: 'Kwento sa Likod ng BPO',
     videos: [
       {
-        id: 'vid-opm-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: '2000s OPM Band Era Highlights',
+        id: 'vid-econ-bpo-1',
+        url: 'https://www.youtube.com/embed/d8hBJN9iVZw',
+        title: 'Kwento sa Likod ng BPO',
       },
     ],
   },
   {
-    id: 'anime-fever-tv',
-    categoryId: 'cultural',
-    title: 'TAGALOG ANIME FEVER & AFTERNOON TV',
-    description: 'During the early to mid-2000s, local TV stations broadcast beloved Japanese anime dubbed into Tagalog, such as Ghost Fighter, Flame of Recca, Slam Dunk, and Hunter x Hunter. After-school anime viewership became a nationwide collective ritual for Generation Y and Z Filipinos.',
-    notes: 'Tagalog dubbing made anime culturally accessible across all socio-economic backgrounds.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: '2000s Philippine TV Anime Nostalgia',
+    id: 'econ-ofw',
+    categoryId: 'economic',
+    title: 'Overseas Filipino Workers (OFWs)',
+    description:
+      'Overseas Filipino workers contribute to the Philippine economy by sending money to their families. These remittances help pay for food, education, housing, and other household expenses. Overseas employment also affects family relationships because some workers spend long periods away from home.',
+    notes:
+      'OFWs support Philippine households through remittances that help pay for food, education, and other needs.',
+    imageUrl: 'https://img.youtube.com/vi/NRXuaMvZ6kE/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/NRXuaMvZ6kE',
+    videoTitle: 'Philippines: A Penny Saved',
     videos: [
       {
-        id: 'vid-anime-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: '2000s Philippine TV Anime Nostalgia',
+        id: 'vid-econ-ofw-1',
+        url: 'https://www.youtube.com/embed/NRXuaMvZ6kE',
+        title: 'Philippines: A Penny Saved',
       },
     ],
   },
+
+  // 3. Environmental Archive
   {
-    id: 'typhoon-ondoy',
+    id: 'env-ondoy',
     categoryId: 'environmental',
-    title: 'TYPHOON ONDOY & CITIZEN RESILIENCE (2009)',
-    description: 'Typhoon Ketsana (Ondoy) dumped a month worth of rain in six hours on Metro Manila in September 2009. It triggered unprecedented social media rescue coordination on Twitter and Facebook, marking the dawn of digital humanitarian response.',
-    notes: 'Highlights community bayanihan and the pivotal shift toward crowd-sourced rescue maps.',
-    imageUrl: NOKIA_PHONES_IMG,
-    videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-    videoTitle: 'Typhoon Ondoy 2009 Bayanihan Archive',
+    title: 'Typhoon Ondoy',
+    description:
+      'Typhoon Ondoy, internationally known as Tropical Storm Ketsana, caused severe flooding in parts of the Philippines in September 2009. Heavy rainfall affected homes, roads, and communities, leaving many people in need of rescue and assistance. The disaster highlighted the importance of disaster preparedness and community response.',
+    notes:
+      'Typhoon Ondoy caused severe flooding in September 2009, highlighting the need for disaster preparedness and emergency response.',
+    imageUrl: 'https://img.youtube.com/vi/Ib_Icfzb5QM/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/Ib_Icfzb5QM',
+    videoTitle: 'Ondoy News Footage',
     videos: [
       {
-        id: 'vid-ondoy-1',
-        url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
-        title: 'Typhoon Ondoy 2009 Bayanihan Archive',
+        id: 'vid-env-ondoy-1',
+        url: 'https://www.youtube.com/embed/Ib_Icfzb5QM',
+        title: 'Ondoy News Footage',
+      },
+    ],
+  },
+  {
+    id: 'env-waste-recycling',
+    categoryId: 'environmental',
+    title: 'Waste Management and Recycling',
+    description:
+      'Waste management is important because improper disposal can contribute to pollution, clogged drainage systems, and health risks. In the Philippines, waste segregation and recycling are among the practices encouraged to reduce waste and improve environmental conditions.',
+    notes:
+      'Waste segregation and recycling help reduce pollution and prevent garbage from clogging drainage systems.',
+    imageUrl: 'https://img.youtube.com/vi/4JDGFNoY-rQ/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/4JDGFNoY-rQ',
+    videoTitle: 'Waste Management and Recycling',
+    videos: [
+      {
+        id: 'vid-env-waste-1',
+        url: 'https://www.youtube.com/embed/4JDGFNoY-rQ',
+        title: 'Waste Management and Recycling',
+      },
+    ],
+  },
+  {
+    id: 'env-plastic-pollution',
+    categoryId: 'environmental',
+    title: 'Plastic Pollution in the Philippines',
+    description:
+      'Plastic pollution is an environmental concern that affects waterways, coastlines, marine life, and communities. Single-use plastic products can accumulate when waste is not collected or disposed of properly. Reducing unnecessary plastic use and improving waste management can help lessen these effects.',
+    notes:
+      'Improperly disposed plastic waste harms waterways and marine life, making waste reduction important.',
+    imageUrl: 'https://img.youtube.com/vi/OdHY9s5Pi7g/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/OdHY9s5Pi7g',
+    videoTitle: 'All Choked Up: The Single-Use Plastics Problem in the Philippines',
+    videos: [
+      {
+        id: 'vid-env-plastic-1',
+        url: 'https://www.youtube.com/embed/OdHY9s5Pi7g',
+        title: 'All Choked Up: The Single-Use Plastics Problem in the Philippines',
+      },
+    ],
+  },
+
+  // 4. Political Archive
+  {
+    id: 'pol-people-power-ii',
+    categoryId: 'political',
+    title: 'People Power II',
+    description:
+      'People Power II, also known as EDSA Dos, was a series of mass protests in January 2001 that led to President Joseph Estrada leaving office. The event demonstrated how public demonstrations and collective action could influence political change in the Philippines.',
+    notes:
+      'People Power II in January 2001 led to President Joseph Estrada leaving office, with text messages helping protesters coordinate.',
+    imageUrl: 'https://img.youtube.com/vi/kVGdsJWLKxs/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/kVGdsJWLKxs',
+    videoTitle: 'TV Patrol Throwback: EDSA Dos in 2001',
+    videos: [
+      {
+        id: 'vid-pol-edsa-1',
+        url: 'https://www.youtube.com/embed/kVGdsJWLKxs',
+        title: 'TV Patrol Throwback: EDSA Dos in 2001',
+      },
+    ],
+  },
+  {
+    id: 'pol-protests-participation',
+    categoryId: 'political',
+    title: 'Political Protests and Public Participation',
+    description:
+      'Political protests provide a way for citizens to express their opinions, raise concerns, and call for changes in government. In the Philippines, public movements have played a role in shaping political discussions and encouraging people to participate in national issues.',
+    notes:
+      'Political protests allow citizens to express concerns and call for government action through public participation.',
+    imageUrl: 'https://img.youtube.com/vi/1UEJvhedgg8/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/1UEJvhedgg8',
+    videoTitle: 'People Power II Coverage',
+    videos: [
+      {
+        id: 'vid-pol-coverage-1',
+        url: 'https://www.youtube.com/embed/1UEJvhedgg8',
+        title: 'People Power II Coverage',
+      },
+    ],
+  },
+
+  // 5. Social Archive
+  {
+    id: 'soc-nokia-texting',
+    categoryId: 'social',
+    title: 'Nokia Phones and Text Messaging',
+    description:
+      'Mobile phones such as the Nokia 3310 were associated with the growth of text messaging in the Philippines. SMS provided a relatively affordable way to communicate with friends and family.',
+    notes:
+      'Nokia phones and SMS made mobile communication more accessible before internet-based messaging apps became common.',
+    imageUrl: 'https://img.youtube.com/vi/ysL5_yCQw_4/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/ysL5_yCQw_4',
+    videoTitle: 'Nokia 3310 and Philippine texting culture video search',
+    videos: [
+      {
+        id: 'vid-soc-nokia-1',
+        url: 'https://www.youtube.com/embed/ysL5_yCQw_4',
+        title: 'Nokia 3310 and Philippine texting culture video search',
+      },
+    ],
+  },
+  {
+    id: 'soc-internet-cafes',
+    categoryId: 'social',
+    title: 'Internet Cafés',
+    description:
+      'Internet cafés gave people access to computers, email, chat rooms, online games, and websites, including those who did not own a computer or have Internet access at home.',
+    notes:
+      'Internet cafés provided computer access for gaming, chatting, email, and socializing, especially for people without home internet.',
+    imageUrl: 'https://img.youtube.com/vi/Qjux-xO8hOk/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/Qjux-xO8hOk',
+    videoTitle: 'Philippine Internet cafés in the 2000s video search',
+    videos: [
+      {
+        id: 'vid-soc-cafe-1',
+        url: 'https://www.youtube.com/embed/Qjux-xO8hOk',
+        title: 'Philippine Internet cafés in the 2000s video search',
+      },
+    ],
+  },
+  {
+    id: 'soc-social-media',
+    categoryId: 'social',
+    title: 'Social Media Platforms and Social Networking',
+    description:
+      'During the 2000s, social networking websites changed how Filipinos communicated and maintained friendships online. Platforms such as Friendster, MySpace, and later Facebook allowed users to create profiles, share photos, post messages, and connect with friends. These websites became important spaces for self-expression and online interaction before today\'s social media apps became common.',
+    notes:
+      'Friendster, MySpace, and Facebook helped Filipinos share photos, create profiles, and maintain friendships online during the 2000s.',
+    imageUrl: 'https://img.youtube.com/vi/xXnbuC8-zUs/hqdefault.jpg',
+    videoUrl: 'https://www.youtube.com/embed/xXnbuC8-zUs',
+    videoTitle: 'Ano nga ba ang Friendster?',
+    videos: [
+      {
+        id: 'vid-soc-friendster-1',
+        url: 'https://www.youtube.com/embed/xXnbuC8-zUs',
+        title: 'Ano nga ba ang Friendster?',
       },
     ],
   },
 ];
 
 export const INITIAL_QUESTIONS: QuizQuestion[] = [
+  // 1. Cultural Archive
   {
-    id: 'q-social-nokia',
-    categoryId: 'social',
-    artifactId: 'nokia-phones',
-    questionText: 'What was one of the main ways Filipinos used mobile phones during the 2000s?',
-    choices: [
-      { id: 'choice-A', letter: 'A', text: 'Text messaging and calls' },
-      { id: 'choice-B', letter: 'B', text: 'Video streaming and social media' },
-    ],
-    correctChoiceId: 'choice-A',
-    explanation: 'Correct! The Philippines was hailed as the "SMS Capital of the World" during the 2000s, sending hundreds of millions of text messages daily before mobile internet and modern smartphones became standard.',
-  },
-  {
-    id: 'q-political-edsa',
-    categoryId: 'political',
-    artifactId: 'edsa-dos',
-    questionText: 'How did Filipinos primarily coordinate crowds during the 2001 EDSA Dos protests?',
-    choices: [
-      { id: 'choice-A', letter: 'A', text: 'Viral SMS chain messages' },
-      { id: 'choice-B', letter: 'B', text: 'TikTok and Instagram Live' },
-    ],
-    correctChoiceId: 'choice-A',
-    explanation: 'Correct! Chains of SMS text messages calling citizens to "Go 2 EDSA, Wear blk" spread across millions of phones within hours.',
-  },
-  {
-    id: 'q-cultural-music',
+    id: 'q-cult-1',
     categoryId: 'cultural',
-    artifactId: 'opm-bands',
-    questionText: 'Which music channel music video chart was most widely watched by Filipino youth in the mid-2000s?',
+    artifactId: 'cult-opm-rock',
+    questionText: 'Which music genre was represented by Filipino bands such as the Eraserheads during the 2000s?',
     choices: [
-      { id: 'choice-A', letter: 'A', text: 'MYX Daily Top 10' },
-      { id: 'choice-B', letter: 'B', text: 'Spotify Global Top 50' },
+      { id: 'choice-A', letter: 'A', text: 'Original Pilipino Music (OPM) and alternative rock' },
+      { id: 'choice-B', letter: 'B', text: 'K-pop idol music only' },
     ],
     correctChoiceId: 'choice-A',
-    explanation: 'Correct! MYX and MTV Philippines were the ultimate television authorities for music videos and votes during the decade.',
+    explanation: 'The Eraserheads were a well-known Filipino band associated with OPM and alternative rock. Their 2008 reunion showed their lasting popularity.',
   },
   {
-    id: 'q-economic-bpo',
+    id: 'q-cult-2',
+    categoryId: 'cultural',
+    artifactId: 'cult-teleseryes',
+    questionText: 'What was one major role of teleseryes in Filipino households during the 2000s?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'Replacing all forms of entertainment' },
+      { id: 'choice-B', letter: 'B', text: 'Providing popular television dramas for family viewing' },
+    ],
+    correctChoiceId: 'choice-B',
+    explanation: 'Teleseryes were a popular form of entertainment, with stories about romance, family, and personal struggles.',
+  },
+
+  // 2. Economic Archive
+  {
+    id: 'q-econ-1',
     categoryId: 'economic',
-    artifactId: 'bpo-boom',
-    questionText: 'What industry experienced an explosive employment boom in Metro Manila throughout the 2000s?',
+    artifactId: 'econ-sari-sari',
+    questionText: 'What was one important purpose of a sari-sari store in a Filipino community?',
     choices: [
-      { id: 'choice-A', letter: 'A', text: 'BPO / Call Centers' },
-      { id: 'choice-B', letter: 'B', text: 'Electric vehicle manufacturing' },
+      { id: 'choice-A', letter: 'A', text: 'Selling everyday goods in small quantities' },
+      { id: 'choice-B', letter: 'B', text: 'Providing international airline services' },
     ],
     correctChoiceId: 'choice-A',
-    explanation: 'Correct! The Business Process Outsourcing (BPO) and call center boom transformed districts like Eastwood and Ortigas into vibrant 24/7 commercial hubs.',
+    explanation: 'Sari-sari stores allowed customers to buy common household products conveniently, often in small amounts.',
   },
   {
-    id: 'q-environmental-ondoy',
-    categoryId: 'environmental',
-    artifactId: 'typhoon-ondoy',
-    questionText: 'Which 2009 typhoon spurred pioneering citizen rescue coordination over Twitter and social networks in Metro Manila?',
+    id: 'q-econ-2',
+    categoryId: 'economic',
+    artifactId: 'econ-ofw',
+    questionText: 'How did many Overseas Filipino Workers (OFWs) support their families in the Philippines?',
     choices: [
-      { id: 'choice-A', letter: 'A', text: 'Typhoon Ondoy (Ketsana)' },
-      { id: 'choice-B', letter: 'B', text: 'Typhoon Yolanda (Haiyan)' },
+      { id: 'choice-A', letter: 'A', text: 'By sending only imported products' },
+      { id: 'choice-B', letter: 'B', text: 'By sending money earned from working abroad' },
+    ],
+    correctChoiceId: 'choice-B',
+    explanation: 'OFWs often sent remittances to help pay for food, education, housing, and other family expenses.',
+  },
+
+  // 3. Environmental Archive
+  {
+    id: 'q-env-1',
+    categoryId: 'environmental',
+    artifactId: 'env-ondoy',
+    questionText: 'What major environmental disaster affected Metro Manila and nearby areas in September 2009?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'A volcanic eruption in Metro Manila' },
+      { id: 'choice-B', letter: 'B', text: 'Severe flooding caused by Tropical Storm Ondoy' },
+    ],
+    correctChoiceId: 'choice-B',
+    explanation: 'Ondoy brought heavy rainfall that caused widespread flooding and affected many communities.',
+  },
+  {
+    id: 'q-env-2',
+    categoryId: 'environmental',
+    artifactId: 'env-waste-recycling',
+    questionText: 'What is one purpose of waste segregation?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'Separating different types of waste for proper disposal and recycling' },
+      { id: 'choice-B', letter: 'B', text: 'Mixing all waste together before disposal' },
     ],
     correctChoiceId: 'choice-A',
-    explanation: 'Correct! Typhoon Ondoy struck in September 2009, prompting the first viral crowd-sourced social media rescue efforts in the country.',
+    explanation: 'Waste segregation helps make recycling easier and supports safer waste management.',
+  },
+
+  // 4. Political Archive
+  {
+    id: 'q-pol-1',
+    categoryId: 'political',
+    artifactId: 'pol-people-power-ii',
+    questionText: 'What happened during People Power II in January 2001?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'The Philippines changed from a republic to a monarchy' },
+      { id: 'choice-B', letter: 'B', text: 'Mass protests led to President Joseph Estrada leaving office' },
+    ],
+    correctChoiceId: 'choice-B',
+    explanation: 'People Power II was a major political movement that resulted in Estrada leaving the presidency.',
+  },
+  {
+    id: 'q-pol-2',
+    categoryId: 'political',
+    artifactId: 'pol-people-power-ii',
+    questionText: 'Which communication method helped spread information and organize people during People Power II?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'Mobile-phone text messaging' },
+      { id: 'choice-B', letter: 'B', text: 'Video calls through modern smartphone apps' },
+    ],
+    correctChoiceId: 'choice-A',
+    explanation: 'Text messaging was widely used to share information and encourage participation during the protests.',
+  },
+
+  // 5. Social Archive
+  {
+    id: 'q-soc-1',
+    categoryId: 'social',
+    artifactId: 'soc-nokia-texting',
+    questionText: 'What was a common use of mobile phones in the Philippines during the 2000s?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'Text messaging and phone calls' },
+      { id: 'choice-B', letter: 'B', text: 'Streaming high-definition videos on modern social media apps' },
+    ],
+    correctChoiceId: 'choice-A',
+    explanation: 'SMS and calls were common ways to communicate before today\'s smartphone apps and mobile streaming became widespread.',
+  },
+  {
+    id: 'q-soc-2',
+    categoryId: 'social',
+    artifactId: 'soc-internet-cafes',
+    questionText: 'Why did many Filipinos visit Internet cafés during the 2000s?',
+    choices: [
+      { id: 'choice-A', letter: 'A', text: 'To access only traditional printed newspapers' },
+      { id: 'choice-B', letter: 'B', text: 'To use computers, browse the Internet, chat, and play online games' },
+    ],
+    correctChoiceId: 'choice-B',
+    explanation: 'Internet cafés provided computer and Internet access for people who did not have these resources at home.',
   },
 ];
 
