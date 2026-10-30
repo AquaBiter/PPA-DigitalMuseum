@@ -283,6 +283,62 @@ export default function App() {
     }
   });
 
+  // Present Time (2026) State
+  const [presentCategories, setPresentCategories] = useState<Category[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa_present_categories');
+      return saved ? JSON.parse(saved) : PRESENT_CATEGORIES;
+    } catch {
+      return PRESENT_CATEGORIES;
+    }
+  });
+
+  const [presentArtifacts, setPresentArtifacts] = useState<Artifact[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa_present_artifacts');
+      return saved ? JSON.parse(saved) : PRESENT_ARTIFACTS;
+    } catch {
+      return PRESENT_ARTIFACTS;
+    }
+  });
+
+  const [presentQuestions, setPresentQuestions] = useState<QuizQuestion[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa_present_questions');
+      return saved ? JSON.parse(saved) : PRESENT_QUESTIONS;
+    } catch {
+      return PRESENT_QUESTIONS;
+    }
+  });
+
+  // Future Time (2030-2040) State
+  const [futureCategories, setFutureCategories] = useState<Category[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa_future_categories');
+      return saved ? JSON.parse(saved) : FUTURE_CATEGORIES;
+    } catch {
+      return FUTURE_CATEGORIES;
+    }
+  });
+
+  const [futureArtifacts, setFutureArtifacts] = useState<Artifact[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa_future_artifacts');
+      return saved ? JSON.parse(saved) : FUTURE_ARTIFACTS;
+    } catch {
+      return FUTURE_ARTIFACTS;
+    }
+  });
+
+  const [futureQuestions, setFutureQuestions] = useState<QuizQuestion[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa_future_questions');
+      return saved ? JSON.parse(saved) : FUTURE_QUESTIONS;
+    } catch {
+      return FUTURE_QUESTIONS;
+    }
+  });
+
   const [aboutContent, setAboutContent] = useState<AboutContent>(() => {
     try {
       const saved = localStorage.getItem('ppa_about_content');
@@ -351,6 +407,30 @@ export default function App() {
   useEffect(() => {
     safeLocalStorageSet('ppa_about_content', JSON.stringify(aboutContent));
   }, [aboutContent]);
+
+  useEffect(() => {
+    safeLocalStorageSet('ppa_present_categories', JSON.stringify(presentCategories));
+  }, [presentCategories]);
+
+  useEffect(() => {
+    safeLocalStorageSet('ppa_present_artifacts', JSON.stringify(presentArtifacts));
+  }, [presentArtifacts]);
+
+  useEffect(() => {
+    safeLocalStorageSet('ppa_present_questions', JSON.stringify(presentQuestions));
+  }, [presentQuestions]);
+
+  useEffect(() => {
+    safeLocalStorageSet('ppa_future_categories', JSON.stringify(futureCategories));
+  }, [futureCategories]);
+
+  useEffect(() => {
+    safeLocalStorageSet('ppa_future_artifacts', JSON.stringify(futureArtifacts));
+  }, [futureArtifacts]);
+
+  useEffect(() => {
+    safeLocalStorageSet('ppa_future_questions', JSON.stringify(futureQuestions));
+  }, [futureQuestions]);
 
   // Navigation State
   const [currentView, setCurrentView] = useState<ViewMode>('home');
@@ -601,9 +681,9 @@ export default function App() {
   const handleOpenFuture = () => {
     setActiveEra('future');
     const catId = selectedCategory.id;
-    const futureArt = FUTURE_ARTIFACTS.find((a) => a.categoryId === catId);
+    const futureArt = futureArtifacts.find((a) => a.categoryId === catId);
     if (futureArt) setSelectedArtifact(futureArt);
-    const futureQ = FUTURE_QUESTIONS.find((q) => q.categoryId === catId);
+    const futureQ = futureQuestions.find((q) => q.categoryId === catId);
     if (futureQ) setSelectedQuestion(futureQ);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -623,9 +703,9 @@ export default function App() {
     setActiveEra(nextEra);
     const catId = selectedCategory.id;
     if (nextEra === 'now') {
-      const firstPresentArt = PRESENT_ARTIFACTS.find((a) => a.categoryId === catId);
+      const firstPresentArt = presentArtifacts.find((a) => a.categoryId === catId);
       if (firstPresentArt) setSelectedArtifact(firstPresentArt);
-      const firstPresentQ = PRESENT_QUESTIONS.find((q) => q.categoryId === catId);
+      const firstPresentQ = presentQuestions.find((q) => q.categoryId === catId);
       if (firstPresentQ) setSelectedQuestion(firstPresentQ);
     } else {
       const firstRetroArt = artifacts.find((a) => a.categoryId === catId);
@@ -638,16 +718,25 @@ export default function App() {
   const handleSelectArtifact = (art: Artifact) => {
     setHasOpenedArtifacts(true);
     setSelectedArtifact(art);
-    const cat = categories.find((c) => c.id === art.categoryId);
+    const cat =
+      categories.find((c) => c.id === art.categoryId) ||
+      presentCategories.find((c) => c.id === art.categoryId) ||
+      futureCategories.find((c) => c.id === art.categoryId);
     if (cat) setSelectedCategory(cat);
     navigateTo('artifacts');
   };
 
   const handleSelectQuestion = (q: QuizQuestion) => {
     setSelectedQuestion(q);
-    const cat = categories.find((c) => c.id === q.categoryId);
+    const cat =
+      categories.find((c) => c.id === q.categoryId) ||
+      presentCategories.find((c) => c.id === q.categoryId) ||
+      futureCategories.find((c) => c.id === q.categoryId);
     if (cat) setSelectedCategory(cat);
-    const art = artifacts.find((a) => a.id === q.artifactId);
+    const art =
+      artifacts.find((a) => a.id === q.artifactId) ||
+      presentArtifacts.find((a) => a.id === q.artifactId) ||
+      futureArtifacts.find((a) => a.id === q.artifactId);
     if (art) setSelectedArtifact(art);
     navigateTo('questions');
   };
@@ -673,6 +762,30 @@ export default function App() {
     syncQuestionsDiff(questions, newQuestions);
   };
 
+  const handleUpdatePresentCategories = (newCats: Category[]) => {
+    setPresentCategories(newCats);
+  };
+
+  const handleUpdatePresentArtifacts = (newArts: Artifact[]) => {
+    setPresentArtifacts(newArts);
+  };
+
+  const handleUpdatePresentQuestions = (newQs: QuizQuestion[]) => {
+    setPresentQuestions(newQs);
+  };
+
+  const handleUpdateFutureCategories = (newCats: Category[]) => {
+    setFutureCategories(newCats);
+  };
+
+  const handleUpdateFutureArtifacts = (newArts: Artifact[]) => {
+    setFutureArtifacts(newArts);
+  };
+
+  const handleUpdateFutureQuestions = (newQs: QuizQuestion[]) => {
+    setFutureQuestions(newQs);
+  };
+
   const handleUpdateAboutContent = (newAbout: AboutContent) => {
     setAboutContent(newAbout);
     syncAboutContentToFirestore(newAbout);
@@ -691,6 +804,12 @@ export default function App() {
     setCategories(cleanCats);
     setArtifacts(cleanArts);
     setQuestions(cleanQs);
+    setPresentCategories(PRESENT_CATEGORIES);
+    setPresentArtifacts(PRESENT_ARTIFACTS);
+    setPresentQuestions(PRESENT_QUESTIONS);
+    setFutureCategories(FUTURE_CATEGORIES);
+    setFutureArtifacts(FUTURE_ARTIFACTS);
+    setFutureQuestions(FUTURE_QUESTIONS);
     setAboutContent(INITIAL_ABOUT_CONTENT);
     setSelectedCategory(cleanCats.find((c) => c.id === 'social') || cleanCats[0]);
     setSelectedArtifact(cleanArts.find((a) => a.id === 'soc-nokia-texting') || cleanArts[0]);
@@ -698,6 +817,12 @@ export default function App() {
     safeLocalStorageRemove('ppa_categories');
     safeLocalStorageRemove('ppa_artifacts');
     safeLocalStorageRemove('ppa_questions');
+    safeLocalStorageRemove('ppa_present_categories');
+    safeLocalStorageRemove('ppa_present_artifacts');
+    safeLocalStorageRemove('ppa_present_questions');
+    safeLocalStorageRemove('ppa_future_categories');
+    safeLocalStorageRemove('ppa_future_artifacts');
+    safeLocalStorageRemove('ppa_future_questions');
     safeLocalStorageRemove('ppa_about_content');
     safeLocalStorageRemove('ppa_declined_artifacts');
     setDeclinedArtifactsCategories([]);
@@ -715,33 +840,33 @@ export default function App() {
   // Active Category resolution depending on activeEra
   const activeCategory: Category =
     activeEra === 'future'
-      ? (FUTURE_CATEGORIES.find((c) => c.id === selectedCategory.id) || FUTURE_CATEGORIES[0])
+      ? (futureCategories.find((c) => c.id === selectedCategory.id) || futureCategories[0])
       : activeEra === 'now'
-      ? (PRESENT_CATEGORIES.find((c) => c.id === selectedCategory.id) || PRESENT_CATEGORIES[0])
+      ? (presentCategories.find((c) => c.id === selectedCategory.id) || presentCategories[0])
       : (categories.find((c) => c.id === selectedCategory.id) || selectedCategory);
 
   // Find artifacts & questions for current category based on activeEra
   const categoryArtifacts =
     activeEra === 'future'
-      ? FUTURE_ARTIFACTS.filter((a) => a.categoryId === selectedCategory.id)
+      ? futureArtifacts.filter((a) => a.categoryId === selectedCategory.id)
       : activeEra === 'now'
-      ? PRESENT_ARTIFACTS.filter((a) => a.categoryId === selectedCategory.id)
+      ? presentArtifacts.filter((a) => a.categoryId === selectedCategory.id)
       : artifacts.filter((a) => a.categoryId === selectedCategory.id);
 
   const currentArtifact =
     categoryArtifacts.find((a) => a.id === selectedArtifact?.id) ||
     categoryArtifacts[0] ||
     (activeEra === 'future'
-      ? FUTURE_ARTIFACTS[0]
+      ? futureArtifacts[0]
       : activeEra === 'now'
-      ? PRESENT_ARTIFACTS[0]
+      ? presentArtifacts[0]
       : artifacts[0]);
 
   const categoryQuestions =
     activeEra === 'future'
-      ? FUTURE_QUESTIONS.filter((q) => q.categoryId === selectedCategory.id)
+      ? futureQuestions.filter((q) => q.categoryId === selectedCategory.id)
       : activeEra === 'now'
-      ? PRESENT_QUESTIONS.filter((q) => q.categoryId === selectedCategory.id)
+      ? presentQuestions.filter((q) => q.categoryId === selectedCategory.id)
       : questions.filter((q) => q.categoryId === selectedCategory.id);
 
   const currentQuestion =
@@ -767,9 +892,9 @@ export default function App() {
         {/* Search live dropdown modal */}
         <SearchDropdown
           searchQuery={searchQuery}
-          categories={categories}
-          artifacts={artifacts}
-          questions={questions}
+          categories={[...categories, ...presentCategories, ...futureCategories]}
+          artifacts={[...artifacts, ...presentArtifacts, ...futureArtifacts]}
+          questions={[...questions, ...presentQuestions, ...futureQuestions]}
           onSelectCategory={handleSelectCategory}
           onSelectArtifact={handleSelectArtifact}
           onSelectQuestion={handleSelectQuestion}
@@ -809,14 +934,26 @@ export default function App() {
               onOpenQuestions={() => navigateTo('questions')}
               onOpenThenAndNow={handleToggleEra}
               onUpdateCategoryBanner={(catId, bannerUrl) => {
-                const updated = categories.map((c) =>
-                  c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
-                );
-                setCategories(updated);
-                setSelectedCategory((prev) =>
-                  prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
-                );
-                syncCategoriesDiff(categories, updated);
+                if (activeEra === 'future') {
+                  const updated = futureCategories.map((c) =>
+                    c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
+                  );
+                  setFutureCategories(updated);
+                } else if (activeEra === 'now') {
+                  const updated = presentCategories.map((c) =>
+                    c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
+                  );
+                  setPresentCategories(updated);
+                } else {
+                  const updated = categories.map((c) =>
+                    c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
+                  );
+                  setCategories(updated);
+                  setSelectedCategory((prev) =>
+                    prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
+                  );
+                  syncCategoriesDiff(categories, updated);
+                }
               }}
             />
           )}
@@ -825,7 +962,7 @@ export default function App() {
           {currentView === 'artifacts' && (
             <ArtifactView
               artifact={currentArtifact}
-              availableArtifacts={categoryArtifacts.length > 0 ? categoryArtifacts : (activeEra === 'now' ? PRESENT_ARTIFACTS : artifacts)}
+              availableArtifacts={categoryArtifacts.length > 0 ? categoryArtifacts : (activeEra === 'future' ? futureArtifacts : activeEra === 'now' ? presentArtifacts : artifacts)}
               onSelectArtifact={setSelectedArtifact}
               onBackToTopic={handleBackToTopicFromArtifacts}
             />
@@ -841,10 +978,20 @@ export default function App() {
               isAdmin={isAdminLoggedIn}
               onSelectQuestion={setSelectedQuestion}
               onUpdateQuestion={(updatedQ) => {
-                const updated = questions.map((q) => (q.id === updatedQ.id ? updatedQ : q));
-                setQuestions(updated);
-                setSelectedQuestion(updatedQ);
-                syncQuestionsDiff(questions, updated);
+                if (activeEra === 'future') {
+                  const updated = futureQuestions.map((q) => (q.id === updatedQ.id ? updatedQ : q));
+                  setFutureQuestions(updated);
+                  setSelectedQuestion(updatedQ);
+                } else if (activeEra === 'now') {
+                  const updated = presentQuestions.map((q) => (q.id === updatedQ.id ? updatedQ : q));
+                  setPresentQuestions(updated);
+                  setSelectedQuestion(updatedQ);
+                } else {
+                  const updated = questions.map((q) => (q.id === updatedQ.id ? updatedQ : q));
+                  setQuestions(updated);
+                  setSelectedQuestion(updatedQ);
+                  syncQuestionsDiff(questions, updated);
+                }
               }}
               onNavigateToAdmin={() => navigateTo('admin')}
             />
@@ -870,6 +1017,12 @@ export default function App() {
               categories={categories}
               artifacts={artifacts}
               questions={questions}
+              presentCategories={presentCategories}
+              presentArtifacts={presentArtifacts}
+              presentQuestions={presentQuestions}
+              futureCategories={futureCategories}
+              futureArtifacts={futureArtifacts}
+              futureQuestions={futureQuestions}
               aboutContent={aboutContent}
               isAuthenticated={isAdminLoggedIn}
               onLoginSuccess={handleAdminLoginSuccess}
@@ -878,6 +1031,12 @@ export default function App() {
               onUpdateCategories={handleUpdateCategories}
               onUpdateArtifacts={handleUpdateArtifacts}
               onUpdateQuestions={handleUpdateQuestions}
+              onUpdatePresentCategories={handleUpdatePresentCategories}
+              onUpdatePresentArtifacts={handleUpdatePresentArtifacts}
+              onUpdatePresentQuestions={handleUpdatePresentQuestions}
+              onUpdateFutureCategories={handleUpdateFutureCategories}
+              onUpdateFutureArtifacts={handleUpdateFutureArtifacts}
+              onUpdateFutureQuestions={handleUpdateFutureQuestions}
               onUpdateAboutContent={handleUpdateAboutContent}
               onResetDefaults={handleResetDefaults}
               onForceSyncCloud={handleForceSyncCloud}

@@ -35,6 +35,7 @@ import {
   QuizQuestion,
   AboutContent,
   TimelineMilestone,
+  EraMode,
 } from '../types';
 import { formatToYouTubeEmbed, parseMultipleYouTubeUrls, extractYouTubeId } from '../utils/youtube';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -46,6 +47,12 @@ interface AdminModalProps {
   categories: Category[];
   artifacts: Artifact[];
   questions: QuizQuestion[];
+  presentCategories?: Category[];
+  presentArtifacts?: Artifact[];
+  presentQuestions?: QuizQuestion[];
+  futureCategories?: Category[];
+  futureArtifacts?: Artifact[];
+  futureQuestions?: QuizQuestion[];
   aboutContent: AboutContent;
   isAuthenticated: boolean;
   onLoginSuccess: () => void;
@@ -54,6 +61,12 @@ interface AdminModalProps {
   onUpdateCategories: (categories: Category[]) => void;
   onUpdateArtifacts: (artifacts: Artifact[]) => void;
   onUpdateQuestions: (questions: QuizQuestion[]) => void;
+  onUpdatePresentCategories?: (categories: Category[]) => void;
+  onUpdatePresentArtifacts?: (artifacts: Artifact[]) => void;
+  onUpdatePresentQuestions?: (questions: QuizQuestion[]) => void;
+  onUpdateFutureCategories?: (categories: Category[]) => void;
+  onUpdateFutureArtifacts?: (artifacts: Artifact[]) => void;
+  onUpdateFutureQuestions?: (questions: QuizQuestion[]) => void;
   onUpdateAboutContent: (about: AboutContent) => void;
   onResetDefaults: () => void;
   onForceSyncCloud?: () => Promise<void> | void;
@@ -65,6 +78,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   categories,
   artifacts,
   questions,
+  presentCategories = [],
+  presentArtifacts = [],
+  presentQuestions = [],
+  futureCategories = [],
+  futureArtifacts = [],
+  futureQuestions = [],
   aboutContent,
   isAuthenticated,
   onLoginSuccess,
@@ -73,11 +92,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onUpdateCategories,
   onUpdateArtifacts,
   onUpdateQuestions,
+  onUpdatePresentCategories,
+  onUpdatePresentArtifacts,
+  onUpdatePresentQuestions,
+  onUpdateFutureCategories,
+  onUpdateFutureArtifacts,
+  onUpdateFutureQuestions,
   onUpdateAboutContent,
   onResetDefaults,
   onForceSyncCloud,
   isCloudQuotaPaused = false,
 }) => {
+  const [selectedEra, setSelectedEra] = useState<EraMode>('then');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -118,6 +144,70 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const getEraLabel = (era: EraMode) => {
+    switch (era) {
+      case 'now':
+        return 'Present Time (2026)';
+      case 'future':
+        return 'Future (2030–2040)';
+      case 'then':
+      default:
+        return 'Retro (2000–2010)';
+    }
+  };
+
+  // Active era datasets based on the era selected by the admin
+  const currentCategories =
+    selectedEra === 'future'
+      ? futureCategories
+      : selectedEra === 'now'
+      ? presentCategories
+      : categories;
+
+  const currentArtifacts =
+    selectedEra === 'future'
+      ? futureArtifacts
+      : selectedEra === 'now'
+      ? presentArtifacts
+      : artifacts;
+
+  const currentQuestions =
+    selectedEra === 'future'
+      ? futureQuestions
+      : selectedEra === 'now'
+      ? presentQuestions
+      : questions;
+
+  const handleCommitCategories = (newCategories: Category[]) => {
+    if (selectedEra === 'future') {
+      onUpdateFutureCategories?.(newCategories);
+    } else if (selectedEra === 'now') {
+      onUpdatePresentCategories?.(newCategories);
+    } else {
+      onUpdateCategories(newCategories);
+    }
+  };
+
+  const handleCommitArtifacts = (newArtifacts: Artifact[]) => {
+    if (selectedEra === 'future') {
+      onUpdateFutureArtifacts?.(newArtifacts);
+    } else if (selectedEra === 'now') {
+      onUpdatePresentArtifacts?.(newArtifacts);
+    } else {
+      onUpdateArtifacts(newArtifacts);
+    }
+  };
+
+  const handleCommitQuestions = (newQuestions: QuizQuestion[]) => {
+    if (selectedEra === 'future') {
+      onUpdateFutureQuestions?.(newQuestions);
+    } else if (selectedEra === 'now') {
+      onUpdatePresentQuestions?.(newQuestions);
+    } else {
+      onUpdateQuestions(newQuestions);
+    }
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (username === 'Admin' && password === 'Admin123') {
@@ -156,23 +246,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         onUpdateSlides(updated);
         showToast('Image uploaded and optimized for hero slide!');
       } else if (uploadTarget.type === 'artifact') {
-        const updated = artifacts.map((a) =>
+        const updated = currentArtifacts.map((a) =>
           a.id === uploadTarget.id ? { ...a, imageUrl: resultDataUrl } : a
         );
-        onUpdateArtifacts(updated);
-        showToast('Image uploaded and optimized for artifact!');
+        handleCommitArtifacts(updated);
+        showToast(`Image uploaded and optimized for ${getEraLabel(selectedEra)} artifact!`);
       } else if (uploadTarget.type === 'category') {
-        const updated = categories.map((c) =>
+        const updated = currentCategories.map((c) =>
           c.id === uploadTarget.id ? { ...c, bannerImageUrl: resultDataUrl } : c
         );
-        onUpdateCategories(updated);
-        showToast('Banner graphic uploaded and optimized!');
+        handleCommitCategories(updated);
+        showToast(`Banner graphic uploaded and optimized for ${getEraLabel(selectedEra)} topic!`);
       } else if (uploadTarget.type === 'question') {
-        const updated = questions.map((q) =>
+        const updated = currentQuestions.map((q) =>
           q.id === uploadTarget.id ? { ...q, imageUrl: resultDataUrl } : q
         );
-        onUpdateQuestions(updated);
-        showToast('Reference image uploaded and optimized for question!');
+        handleCommitQuestions(updated);
+        showToast(`Reference image uploaded and optimized for ${getEraLabel(selectedEra)} question!`);
       }
     } catch (err) {
       console.error('Error compressing uploaded image:', err);
@@ -269,35 +359,36 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   // --- CRUD: CATEGORIES / TOPICS ---
   const handleAddCategory = () => {
+    const eraLabel = getEraLabel(selectedEra);
     const newCat: Category = {
-      id: `topic-${Date.now()}`,
-      name: 'NEW TOPIC',
-      summary: 'Explore this newly archived aspect of 2000s Philippine life.',
-      fullDescription: 'This archive examines this topic in everyday Filipino culture from 2000 to 2010.',
-      accentColor: '#F59E0B',
+      id: `topic-${selectedEra}-${Date.now()}`,
+      name: `NEW ${selectedEra.toUpperCase()} TOPIC`,
+      summary: `Explore this newly archived aspect of Philippine life in ${eraLabel}.`,
+      fullDescription: `This archive examines this topic in everyday Filipino culture during ${eraLabel}.`,
+      accentColor: selectedEra === 'future' ? '#A855F7' : selectedEra === 'now' ? '#06B6D4' : '#F59E0B',
     };
-    onUpdateCategories([...categories, newCat]);
-    showToast('New category added');
+    handleCommitCategories([...currentCategories, newCat]);
+    showToast(`New category added to ${eraLabel}`);
   };
 
   const handleDeleteCategory = (id: string) => {
-    if (categories.length <= 1) {
-      alert('You must have at least one category.');
+    if (currentCategories.length <= 1) {
+      alert(`You must have at least one category in ${getEraLabel(selectedEra)}.`);
       return;
     }
-    onUpdateCategories(categories.filter((c) => c.id !== id));
+    handleCommitCategories(currentCategories.filter((c) => c.id !== id));
     showToast('Category removed');
   };
 
   const handleUpdateCategoryField = <K extends keyof Category>(id: string, field: K, val: Category[K]) => {
-    onUpdateCategories(
-      categories.map((c) => (c.id === id ? { ...c, [field]: val } : c))
+    handleCommitCategories(
+      currentCategories.map((c) => (c.id === id ? { ...c, [field]: val } : c))
     );
   };
 
   const handleAddReferenceLinkToCategory = (catId: string) => {
-    onUpdateCategories(
-      categories.map((c) => {
+    handleCommitCategories(
+      currentCategories.map((c) => {
         if (c.id !== catId) return c;
         const currentLinks: CategoryReferenceLink[] = c.referenceLinks ? [...c.referenceLinks] : [];
         const newLink: CategoryReferenceLink = {
@@ -338,8 +429,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       };
     });
 
-    onUpdateCategories(
-      categories.map((c) => {
+    handleCommitCategories(
+      currentCategories.map((c) => {
         if (c.id !== catId) return c;
         const existing = c.referenceLinks ? [...c.referenceLinks] : [];
         return {
@@ -359,8 +450,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     field: 'url' | 'title',
     val: string
   ) => {
-    onUpdateCategories(
-      categories.map((c) => {
+    handleCommitCategories(
+      currentCategories.map((c) => {
         if (c.id !== catId) return c;
         const links = (c.referenceLinks || []).map((l) =>
           l.id === linkId ? { ...l, [field]: val } : l
@@ -371,8 +462,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   const handleDeleteReferenceLink = (catId: string, linkId: string) => {
-    onUpdateCategories(
-      categories.map((c) => {
+    handleCommitCategories(
+      currentCategories.map((c) => {
         if (c.id !== catId) return c;
         return {
           ...c,
@@ -384,8 +475,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   const handleMoveReferenceLink = (catId: string, linkId: string, direction: 'up' | 'down') => {
-    onUpdateCategories(
-      categories.map((c) => {
+    handleCommitCategories(
+      currentCategories.map((c) => {
         if (c.id !== catId) return c;
         const links = [...(c.referenceLinks || [])];
         const idx = links.findIndex((l) => l.id === linkId);
@@ -402,46 +493,47 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   // --- CRUD: ARTIFACTS ---
   const handleAddArtifact = () => {
-    const defaultCatId = categories[0]?.id || 'social';
+    const defaultCatId = currentCategories[0]?.id || 'cultural';
+    const eraLabel = getEraLabel(selectedEra);
     const newArtifact: Artifact = {
-      id: `artifact-${Date.now()}`,
+      id: `artifact-${selectedEra}-${Date.now()}`,
       categoryId: defaultCatId,
-      title: 'NEW ARTIFACT',
-      description: 'Description of the cultural artifact and its relevance to 2000s Filipino life.',
-      notes: 'Key historical context and observation.',
-      imageUrl: artifacts[0]?.imageUrl || '',
-      videoUrl: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+      title: `NEW ${selectedEra.toUpperCase()} ARTIFACT`,
+      description: `Description of this ${eraLabel} artifact and its relevance to Filipino culture.`,
+      notes: `Key contextual notes for the ${eraLabel} era.`,
+      imageUrl: currentArtifacts[0]?.imageUrl || '',
+      videoUrl: 'https://www.youtube.com/embed/aDatQSELa9c',
       videoTitle: 'Archival video footage',
       videos: [
         {
           id: `vid-${Date.now()}-1`,
-          url: 'https://www.youtube.com/embed/rP1Zc5oJ8aE',
+          url: 'https://www.youtube.com/embed/aDatQSELa9c',
           title: 'Archival video footage',
         },
       ],
     };
-    onUpdateArtifacts([...artifacts, newArtifact]);
-    showToast('New artifact created');
+    handleCommitArtifacts([...currentArtifacts, newArtifact]);
+    showToast(`New ${eraLabel} artifact created`);
   };
 
   const handleDeleteArtifact = (id: string) => {
-    if (artifacts.length <= 1) {
-      alert('You must have at least one artifact.');
+    if (currentArtifacts.length <= 1) {
+      alert(`You must have at least one artifact in ${getEraLabel(selectedEra)}.`);
       return;
     }
-    onUpdateArtifacts(artifacts.filter((a) => a.id !== id));
+    handleCommitArtifacts(currentArtifacts.filter((a) => a.id !== id));
     showToast('Artifact removed');
   };
 
   const handleUpdateArtifactField = <K extends keyof Artifact>(id: string, field: K, val: Artifact[K]) => {
-    onUpdateArtifacts(
-      artifacts.map((a) => (a.id === id ? { ...a, [field]: val } : a))
+    handleCommitArtifacts(
+      currentArtifacts.map((a) => (a.id === id ? { ...a, [field]: val } : a))
     );
   };
 
   const handleAddVideoToArtifact = (artifactId: string) => {
-    onUpdateArtifacts(
-      artifacts.map((a) => {
+    handleCommitArtifacts(
+      currentArtifacts.map((a) => {
         if (a.id !== artifactId) return a;
         const currentVideos: ArtifactVideo[] =
           a.videos && a.videos.length > 0
@@ -472,8 +564,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
-    onUpdateArtifacts(
-      artifacts.map((a) => {
+    handleCommitArtifacts(
+      currentArtifacts.map((a) => {
         if (a.id !== artifactId) return a;
         const currentVideos: ArtifactVideo[] =
           a.videos && a.videos.length > 0
@@ -503,8 +595,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   const handleMoveArtifactVideo = (artifactId: string, index: number, direction: 'up' | 'down') => {
-    onUpdateArtifacts(
-      artifacts.map((a) => {
+    handleCommitArtifacts(
+      currentArtifacts.map((a) => {
         if (a.id !== artifactId) return a;
         const currentVideos: ArtifactVideo[] = a.videos && a.videos.length > 0
           ? [...a.videos]
@@ -527,8 +619,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   const handleUpdateArtifactVideo = (artifactId: string, videoId: string, field: 'url' | 'title', val: string) => {
-    onUpdateArtifacts(
-      artifacts.map((a) => {
+    handleCommitArtifacts(
+      currentArtifacts.map((a) => {
         if (a.id !== artifactId) return a;
         const currentVideos: ArtifactVideo[] =
           a.videos && a.videos.length > 0
@@ -549,8 +641,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   const handleDeleteArtifactVideo = (artifactId: string, videoId: string) => {
-    onUpdateArtifacts(
-      artifacts.map((a) => {
+    handleCommitArtifacts(
+      currentArtifacts.map((a) => {
         if (a.id !== artifactId) return a;
         const currentVideos: ArtifactVideo[] =
           a.videos && a.videos.length > 0
@@ -569,46 +661,47 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   // --- CRUD: QUESTIONS (Strictly per Topic / Category) ---
   const handleAddQuestionToCategory = (targetCatId: string) => {
-    const cat = categories.find((c) => c.id === targetCatId) || categories[0];
-    const catArtifact = artifacts.find((a) => a.categoryId === targetCatId);
+    const cat = currentCategories.find((c) => c.id === targetCatId) || currentCategories[0];
+    const catArtifact = currentArtifacts.find((a) => a.categoryId === targetCatId);
+    const eraLabel = getEraLabel(selectedEra);
 
     const newQuestion: QuizQuestion = {
-      id: `question-${Date.now()}`,
+      id: `question-${selectedEra}-${Date.now()}`,
       categoryId: targetCatId,
       artifactId: catArtifact?.id,
-      questionText: `What was a defining ${cat?.name || ''} milestone during the 2000s?`,
+      questionText: `What is a key ${cat?.name || ''} development in ${eraLabel}?`,
       choices: [
         { id: `choice-A-${Date.now()}`, letter: 'A', text: 'Option A' },
         { id: `choice-B-${Date.now()}`, letter: 'B', text: 'Option B' },
       ],
       correctChoiceId: `choice-A-${Date.now()}`,
-      explanation: 'Historical context for the answer.',
+      explanation: `Educational context for the ${eraLabel} answer.`,
     };
-    onUpdateQuestions([...questions, newQuestion]);
-    showToast(`Added question to ${cat?.name || 'Topic'}`);
+    handleCommitQuestions([...currentQuestions, newQuestion]);
+    showToast(`Added question to ${cat?.name || 'Topic'} (${eraLabel})`);
   };
 
   const handleDeleteQuestion = (id: string) => {
-    onUpdateQuestions(questions.filter((q) => q.id !== id));
+    handleCommitQuestions(currentQuestions.filter((q) => q.id !== id));
     showToast('Question removed');
   };
 
   const handleUpdateQuestionCategory = (id: string, newCatId: string) => {
-    onUpdateQuestions(
-      questions.map((q) => (q.id === id ? { ...q, categoryId: newCatId } : q))
+    handleCommitQuestions(
+      currentQuestions.map((q) => (q.id === id ? { ...q, categoryId: newCatId } : q))
     );
     showToast('Question moved to new topic');
   };
 
   const handleUpdateQuestionText = (id: string, text: string) => {
-    onUpdateQuestions(
-      questions.map((q) => (q.id === id ? { ...q, questionText: text } : q))
+    handleCommitQuestions(
+      currentQuestions.map((q) => (q.id === id ? { ...q, questionText: text } : q))
     );
   };
 
   const handleUpdateChoiceText = (qId: string, choiceId: string, text: string) => {
-    onUpdateQuestions(
-      questions.map((q) => {
+    handleCommitQuestions(
+      currentQuestions.map((q) => {
         if (q.id !== qId) return q;
         return {
           ...q,
@@ -619,8 +712,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   const handleSetCorrectChoice = (qId: string, choiceId: string) => {
-    onUpdateQuestions(
-      questions.map((q) => (q.id === qId ? { ...q, correctChoiceId: choiceId } : q))
+    handleCommitQuestions(
+      currentQuestions.map((q) => (q.id === qId ? { ...q, correctChoiceId: choiceId } : q))
     );
     showToast('Updated correct answer');
   };
@@ -751,13 +844,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     );
   }
 
-  // Active question topic object
+  // Active question topic object for the selected era
   const activeQuestionCategoryObj =
-    categories.find((c) => c.id === selectedQuestionCategory) || categories[0];
+    currentCategories.find((c) => c.id === selectedQuestionCategory) || currentCategories[0];
+  const effectiveQuestionCatId = activeQuestionCategoryObj?.id || selectedQuestionCategory;
 
   // Questions filtered strictly to the selected topic
-  const questionsInActiveCategory = questions.filter(
-    (q) => q.categoryId === selectedQuestionCategory
+  const questionsInActiveCategory = currentQuestions.filter(
+    (q) => q.categoryId === effectiveQuestionCatId
   );
 
   // --- LOGGED IN: FULL CRUD MANAGEMENT DASHBOARD ---
@@ -905,7 +999,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           }`}
         >
           <FolderOpen className="w-4 h-4" />
-          Artifacts ({artifacts.length})
+          Artifacts ({currentArtifacts.length})
         </button>
 
         <button
@@ -917,7 +1011,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           }`}
         >
           <HelpCircle className="w-4 h-4" />
-          Questions Per Topic ({questions.length})
+          Questions Per Topic ({currentQuestions.length})
         </button>
 
         <button
@@ -929,7 +1023,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           }`}
         >
           <Layers className="w-4 h-4" />
-          Topics / Categories ({categories.length})
+          Topics / Categories ({currentCategories.length})
         </button>
 
         <button
@@ -955,16 +1049,105 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           <BookOpen className="w-4 h-4" />
           About & Timeline ({aboutContent.milestones.length})
         </button>
-
       </div>
+
+      {/* ERA SELECTOR BAR: Allows toggling between Retro (2000–2010), Present Time (2026), and Future (2030–2040) */}
+      {(activeTab === 'artifacts' || activeTab === 'questions' || activeTab === 'topics') && (
+        <div className="mb-6 p-3 bg-zinc-100 rounded-2xl border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+              Active Era to Manage:
+            </span>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-200 text-zinc-800">
+              {getEraLabel(selectedEra)}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedEra('then')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedEra === 'then'
+                  ? 'bg-black text-white shadow-sm ring-2 ring-black'
+                  : 'bg-white text-zinc-700 hover:bg-zinc-50 border border-zinc-300'
+              }`}
+            >
+              <span>🕰️ Retro (2000–2010)</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                  selectedEra === 'then' ? 'bg-zinc-800 text-white' : 'bg-zinc-200 text-zinc-700'
+                }`}
+              >
+                {activeTab === 'artifacts'
+                  ? artifacts.length
+                  : activeTab === 'questions'
+                  ? questions.length
+                  : categories.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedEra('now')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedEra === 'now'
+                  ? 'bg-cyan-600 text-white shadow-sm ring-2 ring-cyan-600'
+                  : 'bg-white text-zinc-700 hover:bg-zinc-50 border border-zinc-300'
+              }`}
+            >
+              <span>⚡ Present Time (2026)</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                  selectedEra === 'now' ? 'bg-cyan-700 text-white' : 'bg-zinc-200 text-zinc-700'
+                }`}
+              >
+                {activeTab === 'artifacts'
+                  ? presentArtifacts.length
+                  : activeTab === 'questions'
+                  ? presentQuestions.length
+                  : presentCategories.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedEra('future')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedEra === 'future'
+                  ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-600'
+                  : 'bg-white text-zinc-700 hover:bg-zinc-50 border border-zinc-300'
+              }`}
+            >
+              <span>🔮 Future (2030–2040)</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                  selectedEra === 'future' ? 'bg-purple-700 text-white' : 'bg-zinc-200 text-zinc-700'
+                }`}
+              >
+                {activeTab === 'artifacts'
+                  ? futureArtifacts.length
+                  : activeTab === 'questions'
+                  ? futureQuestions.length
+                  : futureCategories.length}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* TAB CONTENT: ARTIFACTS */}
       {activeTab === 'artifacts' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-bebas text-2xl text-zinc-900 font-bold">
-              Manage Museum Artifacts
-            </h3>
+            <div>
+              <h3 className="font-bebas text-2xl text-zinc-900 font-bold">
+                Manage Museum Artifacts — {getEraLabel(selectedEra)}
+              </h3>
+              <p className="text-xs text-zinc-500">
+                Editing artifacts for {getEraLabel(selectedEra)}. Changes will immediately update visitors and public views.
+              </p>
+            </div>
             <button
               onClick={handleAddArtifact}
               className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs sm:text-sm font-bold px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-sm"
@@ -975,7 +1158,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {artifacts.map((art) => (
+            {currentArtifacts.map((art) => (
               <div
                 key={art.id}
                 className="p-5 rounded-2xl border border-zinc-200 bg-zinc-50 shadow-sm flex flex-col justify-between"
@@ -1007,7 +1190,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       onChange={(e) => handleUpdateArtifactField(art.id, 'categoryId', e.target.value)}
                       className="w-full text-xs font-semibold px-2.5 py-1.5 rounded border border-zinc-300 bg-white text-zinc-800"
                     >
-                      {categories.map((c) => (
+                      {currentCategories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>
@@ -1312,15 +1495,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-bebas text-2xl text-zinc-900 font-bold">
-                Manage Quiz Questions Per Topic
+                Manage Quiz Questions Per Topic — {getEraLabel(selectedEra)}
               </h3>
               <p className="text-xs text-zinc-500">
-                Questions are strictly isolated to their corresponding category. Select a topic below to manage its questions.
+                Questions are strictly isolated to their corresponding category in {getEraLabel(selectedEra)}. Select a topic below to manage its questions.
               </p>
             </div>
 
             <button
-              onClick={() => handleAddQuestionToCategory(selectedQuestionCategory)}
+              onClick={() => handleAddQuestionToCategory(effectiveQuestionCatId)}
               className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs sm:text-sm font-bold px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
@@ -1331,12 +1514,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           {/* Topic / Category Filter Buttons Bar */}
           <div className="bg-zinc-100 p-2 sm:p-3 rounded-xl border border-zinc-200">
             <span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-2 px-1">
-              Select Category To View / Create Questions:
+              Select Category To View / Create Questions ({getEraLabel(selectedEra)}):
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              {categories.map((cat) => {
-                const count = questions.filter((q) => q.categoryId === cat.id).length;
-                const isSelected = selectedQuestionCategory === cat.id;
+              {currentCategories.map((cat) => {
+                const count = currentQuestions.filter((q) => q.categoryId === cat.id).length;
+                const isSelected = effectiveQuestionCatId === cat.id;
 
                 return (
                   <button
@@ -1370,13 +1553,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             <div className="p-8 text-center bg-zinc-50 rounded-2xl border border-zinc-200">
               <HelpCircle className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
               <h4 className="font-bold text-zinc-800 text-sm">
-                No questions created for {activeQuestionCategoryObj?.name} yet.
+                No questions created for {activeQuestionCategoryObj?.name} in {getEraLabel(selectedEra)} yet.
               </h4>
               <p className="text-xs text-zinc-500 mt-1 mb-4">
                 Questions are placed only in their chosen category and won't appear randomly in other topics.
               </p>
               <button
-                onClick={() => handleAddQuestionToCategory(selectedQuestionCategory)}
+                onClick={() => handleAddQuestionToCategory(effectiveQuestionCatId)}
                 className="bg-black text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 Create First Question for {activeQuestionCategoryObj?.name}
@@ -1412,7 +1595,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         onChange={(e) => handleUpdateQuestionCategory(q.id, e.target.value)}
                         className="w-full text-xs font-semibold px-2.5 py-1.5 rounded border border-zinc-300 bg-white text-zinc-800"
                       >
-                        {categories.map((c) => (
+                        {currentCategories.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}
                           </option>
@@ -1472,8 +1655,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       <textarea
                         value={q.explanation}
                         onChange={(e) => {
-                          onUpdateQuestions(
-                            questions.map((item) =>
+                          handleCommitQuestions(
+                            currentQuestions.map((item) =>
                               item.id === q.id ? { ...item, explanation: e.target.value } : item
                             )
                           );
@@ -1501,8 +1684,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              onUpdateQuestions(
-                                questions.map((item) =>
+                              handleCommitQuestions(
+                                currentQuestions.map((item) =>
                                   item.id === q.id ? { ...item, imageUrl: undefined } : item
                                 )
                               );
@@ -1515,7 +1698,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         )}
                       </div>
                       {(() => {
-                        const qCat = categories.find((c) => c.id === q.categoryId);
+                        const qCat = currentCategories.find((c) => c.id === q.categoryId);
                         const bannerImg = q.imageUrl || qCat?.bannerImageUrl || DEFAULT_CATEGORY_BANNER_SVG;
                         return (
                           <div className="w-full h-28 rounded-lg overflow-hidden border border-zinc-200 bg-zinc-950/5 p-2 flex items-center justify-center">
@@ -1540,9 +1723,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       {activeTab === 'topics' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-bebas text-2xl text-zinc-900 font-bold">
-              Manage Topics & Categories
-            </h3>
+            <div>
+              <h3 className="font-bebas text-2xl text-zinc-900 font-bold">
+                Manage Topics & Categories — {getEraLabel(selectedEra)}
+              </h3>
+              <p className="text-xs text-zinc-500">
+                Editing topics, descriptions, and reference links for {getEraLabel(selectedEra)}.
+              </p>
+            </div>
             <button
               onClick={handleAddCategory}
               className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-800 text-xs sm:text-sm font-bold px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-sm"
@@ -1553,7 +1741,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {categories.map((cat) => (
+            {currentCategories.map((cat) => (
               <div
                 key={cat.id}
                 className="p-5 rounded-2xl border border-zinc-200 bg-zinc-50 shadow-sm flex flex-col justify-between"

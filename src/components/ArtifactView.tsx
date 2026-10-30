@@ -126,21 +126,10 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
             )}
           </div>
 
-          {/* Right Column: Media Showcase (Image Container + Direct YouTube Video) */}
-          <div className="lg:col-span-6 flex flex-col space-y-6 sm:space-y-8">
-            {/* Image Showcase: Flexible wrapping container preventing any cropping */}
-            <div className="w-full rounded-xl overflow-hidden border border-zinc-200 shadow-sm bg-zinc-950/5 p-3 flex items-center justify-center min-h-[260px] max-h-[500px]">
-              <img
-                src={artifact.imageUrl}
-                alt={cleanTitle}
-                className="max-w-full max-h-[460px] w-auto h-auto object-contain rounded-lg shadow-inner"
-              />
-            </div>
-
-            {/* Video Section: Direct YouTube embed(s) with multiple video support (omitted if No YT Video Embed is active) */}
-            {!artifact.noVideoEmbed && videoList.length > 0 && embedUrl && (
-              <div>
-
+          {/* Right Column: Media Showcase (Direct YouTube Video Player in place of former reference image) */}
+          <div className="lg:col-span-6 flex flex-col justify-start">
+            {!artifact.noVideoEmbed && videoList.length > 0 && embedUrl ? (
+              <div className="w-full flex flex-col">
                 {/* Multiple Video Selection Tabs (if artifact has 2 or more videos) */}
                 {videoList.length > 1 && (
                   <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -162,11 +151,11 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
                   </div>
                 )}
 
-                {/* Direct Embedded Video Player Frame */}
-                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-300 shadow-md bg-black">
+                {/* Direct Embedded Video Player Frame - Positioned directly in place of former reference image */}
+                <div className="relative w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden border border-zinc-300 shadow-md bg-black">
                   <iframe
                     key={embedUrl}
-                    src={embedUrl}
+                    src={embedUrl.includes('?') ? `${embedUrl}&rel=0&modestbranding=1` : `${embedUrl}?rel=0&modestbranding=1`}
                     title={currentVideo?.title || artifact.videoTitle || cleanTitle}
                     className="w-full h-full border-0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -176,11 +165,17 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({
 
                 {/* Active Video Title / Description */}
                 {(currentVideo?.title || artifact.videoTitle) && (
-                  <p className="text-xs sm:text-sm text-zinc-600 mt-2 font-semibold flex items-center gap-1.5">
-                    <Play className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                  <p className="text-xs sm:text-sm text-zinc-600 mt-2.5 font-semibold flex items-center gap-1.5">
+                    <Play className="w-3.5 h-3.5 text-red-500 fill-red-500 shrink-0" />
                     <span>{currentVideo?.title || artifact.videoTitle}</span>
                   </p>
                 )}
+              </div>
+            ) : (
+              <div className="w-full aspect-video rounded-xl sm:rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center p-6 text-center text-zinc-400">
+                <Film className="w-10 h-10 text-zinc-300 mb-2" />
+                <p className="text-sm font-medium text-zinc-600">Archival Video Not Available</p>
+                <p className="text-xs text-zinc-400 mt-1 max-w-sm">This artifact is documented through archival notes, historical context, and exhibition questions.</p>
               </div>
             )}
           </div>
