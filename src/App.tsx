@@ -11,7 +11,17 @@ import {
   INITIAL_QUESTIONS,
   INITIAL_ABOUT_CONTENT,
 } from './data/initialData';
-import { Slide, Category, Artifact, QuizQuestion, ViewMode, AboutContent } from './types';
+import {
+  PRESENT_CATEGORIES,
+  PRESENT_ARTIFACTS,
+  PRESENT_QUESTIONS,
+} from './data/presentData';
+import {
+  FUTURE_CATEGORIES,
+  FUTURE_ARTIFACTS,
+  FUTURE_QUESTIONS,
+} from './data/futureData';
+import { Slide, Category, Artifact, QuizQuestion, ViewMode, AboutContent, EraMode } from './types';
 import { Header } from './components/Header';
 import { HeroSlider } from './components/HeroSlider';
 import { CategoryGrid } from './components/CategoryGrid';
@@ -276,7 +286,14 @@ export default function App() {
   const [aboutContent, setAboutContent] = useState<AboutContent>(() => {
     try {
       const saved = localStorage.getItem('ppa_about_content');
-      return saved ? JSON.parse(saved) : INITIAL_ABOUT_CONTENT;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.milestones && parsed.milestones.length < 13) {
+          return INITIAL_ABOUT_CONTENT;
+        }
+        return parsed;
+      }
+      return INITIAL_ABOUT_CONTENT;
     } catch {
       return INITIAL_ABOUT_CONTENT;
     }
@@ -337,6 +354,7 @@ export default function App() {
 
   // Navigation State
   const [currentView, setCurrentView] = useState<ViewMode>('home');
+  const [activeEra, setActiveEra] = useState<EraMode>('then');
   const [history, setHistory] = useState<ViewMode[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category>(
     categories.find((c) => c.id === 'social') || categories[0]
@@ -494,7 +512,12 @@ export default function App() {
       onAbout: (cloudAbout) => {
         if (!isSubscribed) return;
         if (cloudAbout) {
-          setAboutContent(cloudAbout);
+          if (cloudAbout.milestones && cloudAbout.milestones.length < 13) {
+            setAboutContent(INITIAL_ABOUT_CONTENT);
+            syncAboutContentToFirestore(INITIAL_ABOUT_CONTENT);
+          } else {
+            setAboutContent(cloudAbout);
+          }
         }
       },
       onError: (err) => {
@@ -530,7 +553,11 @@ export default function App() {
     } else if (currentView === 'questions' || currentView === 'then-and-now') {
       setCurrentView('category');
     } else if (currentView === 'category') {
-      setCurrentView('home');
+      if (activeEra === 'future') {
+        setActiveEra('then');
+      } else {
+        setCurrentView('home');
+      }
     } else if (currentView === 'admin' || currentView === 'about') {
       // Go back without logging out the admin!
       if (history.length > 0) {
@@ -561,6 +588,7 @@ export default function App() {
 
   const handleSelectCategory = (cat: Category) => {
     setSelectedCategory(cat);
+    setActiveEra('then'); // Reset to 2000-2010 retro era when selecting topic from home
     const catArt = artifacts.find((a) => a.categoryId === cat.id);
     if (catArt) setSelectedArtifact(catArt);
 
@@ -568,6 +596,43 @@ export default function App() {
     if (catQ) setSelectedQuestion(catQ);
 
     navigateTo('category');
+  };
+
+  const handleOpenFuture = () => {
+    setActiveEra('future');
+    const catId = selectedCategory.id;
+    const futureArt = FUTURE_ARTIFACTS.find((a) => a.categoryId === catId);
+    if (futureArt) setSelectedArtifact(futureArt);
+    const futureQ = FUTURE_QUESTIONS.find((q) => q.categoryId === catId);
+    if (futureQ) setSelectedQuestion(futureQ);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleToggleEra = () => {
+    if (activeEra === 'future') {
+      setActiveEra('then');
+      const catId = selectedCategory.id;
+      const firstRetroArt = artifacts.find((a) => a.categoryId === catId);
+      if (firstRetroArt) setSelectedArtifact(firstRetroArt);
+      const firstRetroQ = questions.find((q) => q.categoryId === catId);
+      if (firstRetroQ) setSelectedQuestion(firstRetroQ);
+      return;
+    }
+
+    const nextEra: EraMode = activeEra === 'then' ? 'now' : 'then';
+    setActiveEra(nextEra);
+    const catId = selectedCategory.id;
+    if (nextEra === 'now') {
+      const firstPresentArt = PRESENT_ARTIFACTS.find((a) => a.categoryId === catId);
+      if (firstPresentArt) setSelectedArtifact(firstPresentArt);
+      const firstPresentQ = PRESENT_QUESTIONS.find((q) => q.categoryId === catId);
+      if (firstPresentQ) setSelectedQuestion(firstPresentQ);
+    } else {
+      const firstRetroArt = artifacts.find((a) => a.categoryId === catId);
+      if (firstRetroArt) setSelectedArtifact(firstRetroArt);
+      const firstRetroQ = questions.find((q) => q.categoryId === catId);
+      if (firstRetroQ) setSelectedQuestion(firstRetroQ);
+    }
   };
 
   const handleSelectArtifact = (art: Artifact) => {
@@ -647,18 +712,38 @@ export default function App() {
     );
   };
 
-  // Find artifacts & questions for current category
-  const categoryArtifacts = artifacts.filter(
-    (a) => a.categoryId === selectedCategory.id
-  );
+  // Active Category resolution depending on activeEra
+  const activeCategory: Category =
+    activeEra === 'future'
+      ? (FUTURE_CATEGORIES.find((c) => c.id === selectedCategory.id) || FUTURE_CATEGORIES[0])
+      : activeEra === 'now'
+      ? (PRESENT_CATEGORIES.find((c) => c.id === selectedCategory.id) || PRESENT_CATEGORIES[0])
+      : (categories.find((c) => c.id === selectedCategory.id) || selectedCategory);
+
+  // Find artifacts & questions for current category based on activeEra
+  const categoryArtifacts =
+    activeEra === 'future'
+      ? FUTURE_ARTIFACTS.filter((a) => a.categoryId === selectedCategory.id)
+      : activeEra === 'now'
+      ? PRESENT_ARTIFACTS.filter((a) => a.categoryId === selectedCategory.id)
+      : artifacts.filter((a) => a.categoryId === selectedCategory.id);
+
   const currentArtifact =
     categoryArtifacts.find((a) => a.id === selectedArtifact?.id) ||
     categoryArtifacts[0] ||
-    artifacts[0];
+    (activeEra === 'future'
+      ? FUTURE_ARTIFACTS[0]
+      : activeEra === 'now'
+      ? PRESENT_ARTIFACTS[0]
+      : artifacts[0]);
 
-  const categoryQuestions = questions.filter(
-    (q) => q.categoryId === selectedCategory.id
-  );
+  const categoryQuestions =
+    activeEra === 'future'
+      ? FUTURE_QUESTIONS.filter((q) => q.categoryId === selectedCategory.id)
+      : activeEra === 'now'
+      ? PRESENT_QUESTIONS.filter((q) => q.categoryId === selectedCategory.id)
+      : questions.filter((q) => q.categoryId === selectedCategory.id);
+
   const currentQuestion =
     categoryQuestions.find((q) => q.id === selectedQuestion?.id) ||
     categoryQuestions[0];
@@ -710,15 +795,19 @@ export default function App() {
           {/* VIEW 2: Category Detail View */}
           {currentView === 'category' && (
             <CategoryDetail
-              category={selectedCategory}
+              category={activeCategory}
+              featuredArtifact={currentArtifact}
               isAdmin={isAdminLoggedIn}
               hasDeclinedArtifacts={declinedArtifactsCategories.includes(selectedCategory.id)}
+              activeEra={activeEra}
+              onToggleEra={handleToggleEra}
+              onOpenFuture={handleOpenFuture}
               onOpenArtifacts={() => {
                 setHasOpenedArtifacts(true);
                 navigateTo('artifacts');
               }}
               onOpenQuestions={() => navigateTo('questions')}
-              onOpenThenAndNow={() => navigateTo('then-and-now')}
+              onOpenThenAndNow={handleToggleEra}
               onUpdateCategoryBanner={(catId, bannerUrl) => {
                 const updated = categories.map((c) =>
                   c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
@@ -736,7 +825,7 @@ export default function App() {
           {currentView === 'artifacts' && (
             <ArtifactView
               artifact={currentArtifact}
-              availableArtifacts={categoryArtifacts.length > 0 ? categoryArtifacts : artifacts}
+              availableArtifacts={categoryArtifacts.length > 0 ? categoryArtifacts : (activeEra === 'now' ? PRESENT_ARTIFACTS : artifacts)}
               onSelectArtifact={setSelectedArtifact}
               onBackToTopic={handleBackToTopicFromArtifacts}
             />
@@ -746,7 +835,7 @@ export default function App() {
           {currentView === 'questions' && (
             <QuestionView
               question={currentQuestion}
-              category={selectedCategory}
+              category={activeCategory}
               artifact={currentArtifact}
               availableQuestions={categoryQuestions}
               isAdmin={isAdminLoggedIn}

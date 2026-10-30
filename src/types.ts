@@ -73,4 +73,6 @@ export interface AboutContent {
   milestones: TimelineMilestone[];
 }
 
+export type EraMode = 'then' | 'now' | 'future';
+
 export type ViewMode = 'home' | 'category' | 'artifacts' | 'questions' | 'about' | 'admin' | 'then-and-now';

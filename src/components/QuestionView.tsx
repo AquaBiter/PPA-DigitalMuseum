@@ -267,16 +267,23 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
             {displayImageUrl ? (
               <img
                 src={displayImageUrl}
-                alt={`${category.name} Archive Banner Graphic`}
+                alt={`${category.name} Archive Reference`}
                 className="max-w-full max-h-[440px] w-auto h-auto object-contain rounded-lg shadow-inner"
               />
             ) : (
-              <div className="text-zinc-400 text-sm italic">No reference image assigned</div>
+              <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-400">
+                <span className="font-bebas text-2xl text-zinc-700 tracking-wider mb-1">
+                  {category.name} ARCHIVE
+                </span>
+                <span className="text-xs text-zinc-500">
+                  Interactive Knowledge & Comprehension Check
+                </span>
+              </div>
             )}
           </div>
 
           <p className="text-center font-bebas text-lg text-zinc-600 tracking-wider mt-2">
-            {category.name} ARCHIVE BANNER GRAPHIC
+            {category.name} ARCHIVE
           </p>
 
           {/* Change Reference Image Option - STRICTLY ADMIN ONLY */}

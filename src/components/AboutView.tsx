@@ -42,22 +42,39 @@ export const AboutView: React.FC<AboutViewProps> = ({ content }) => {
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {content.milestones.map((m) => (
-            <div
-              key={m.id || m.year}
-              className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200 hover:border-zinc-400 transition-colors"
-            >
-              <div className="font-bebas text-3xl text-black font-extrabold tracking-wider">
-                {m.year}
+          {content.milestones.map((m) => {
+            const isSpecialEra = m.year.includes('Present') || m.year.includes('Future');
+            return (
+              <div
+                key={m.id || m.year}
+                className={`p-5 rounded-2xl border transition-colors ${
+                  m.year.includes('Future')
+                    ? 'bg-purple-50/40 border-purple-200 hover:border-purple-400 sm:col-span-2 lg:col-span-1'
+                    : m.year.includes('Present')
+                    ? 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-400'
+                    : 'bg-zinc-50 border-zinc-200 hover:border-zinc-400'
+                }`}
+              >
+                <div
+                  className={`font-bebas text-2xl sm:text-3xl font-extrabold tracking-wider ${
+                    m.year.includes('Future')
+                      ? 'text-purple-800'
+                      : m.year.includes('Present')
+                      ? 'text-emerald-800'
+                      : 'text-black'
+                  }`}
+                >
+                  {m.year}
+                </div>
+                <h4 className="font-bold text-base text-zinc-900 mt-1 mb-2">
+                  {m.title}
+                </h4>
+                <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed whitespace-pre-line">
+                  {m.desc}
+                </p>
               </div>
-              <h4 className="font-bold text-base text-zinc-900 mt-1 mb-2">
-                {m.title}
-              </h4>
-              <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed">
-                {m.desc}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
