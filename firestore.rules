@@ -89,7 +89,7 @@ service cloud.firestore {
       allow delete: if isValidId(slideId);
     }
 
-    // Categories
+    // Categories (Retro, Present, Future)
     match /categories/{categoryId} {
       allow get, list: if true;
       allow create: if isValidId(categoryId) && isValidCategory(incoming());
@@ -97,7 +97,21 @@ service cloud.firestore {
       allow delete: if isValidId(categoryId);
     }
 
-    // Artifacts
+    match /present_categories/{categoryId} {
+      allow get, list: if true;
+      allow create: if isValidId(categoryId) && isValidCategory(incoming());
+      allow update: if isValidId(categoryId) && isValidCategory(incoming());
+      allow delete: if isValidId(categoryId);
+    }
+
+    match /future_categories/{categoryId} {
+      allow get, list: if true;
+      allow create: if isValidId(categoryId) && isValidCategory(incoming());
+      allow update: if isValidId(categoryId) && isValidCategory(incoming());
+      allow delete: if isValidId(categoryId);
+    }
+
+    // Artifacts (Retro, Present, Future)
     match /artifacts/{artifactId} {
       allow get, list: if true;
       allow create: if isValidId(artifactId) && isValidArtifact(incoming());
@@ -105,8 +119,36 @@ service cloud.firestore {
       allow delete: if isValidId(artifactId);
     }
 
-    // Questions
+    match /present_artifacts/{artifactId} {
+      allow get, list: if true;
+      allow create: if isValidId(artifactId) && isValidArtifact(incoming());
+      allow update: if isValidId(artifactId) && isValidArtifact(incoming());
+      allow delete: if isValidId(artifactId);
+    }
+
+    match /future_artifacts/{artifactId} {
+      allow get, list: if true;
+      allow create: if isValidId(artifactId) && isValidArtifact(incoming());
+      allow update: if isValidId(artifactId) && isValidArtifact(incoming());
+      allow delete: if isValidId(artifactId);
+    }
+
+    // Questions (Retro, Present, Future)
     match /questions/{questionId} {
+      allow get, list: if true;
+      allow create: if isValidId(questionId) && isValidQuestion(incoming());
+      allow update: if isValidId(questionId) && isValidQuestion(incoming());
+      allow delete: if isValidId(questionId);
+    }
+
+    match /present_questions/{questionId} {
+      allow get, list: if true;
+      allow create: if isValidId(questionId) && isValidQuestion(incoming());
+      allow update: if isValidId(questionId) && isValidQuestion(incoming());
+      allow delete: if isValidId(questionId);
+    }
+
+    match /future_questions/{questionId} {
       allow get, list: if true;
       allow create: if isValidId(questionId) && isValidQuestion(incoming());
       allow update: if isValidId(questionId) && isValidQuestion(incoming());

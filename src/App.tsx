@@ -45,6 +45,13 @@ import {
   syncCategoriesDiff,
   syncArtifactsDiff,
   syncQuestionsDiff,
+  syncPresentCategoriesDiff,
+  syncPresentArtifactsDiff,
+  syncPresentQuestionsDiff,
+  syncFutureCategoriesDiff,
+  syncFutureArtifactsDiff,
+  syncFutureQuestionsDiff,
+  autoMigrateLocalDataToFirestore,
   syncAboutContentToFirestore,
   resetFirestoreToDefaults,
   isFirestoreQuotaExhausted,
@@ -523,7 +530,8 @@ export default function App() {
   useEffect(() => {
     let isSubscribed = true;
 
-    // Check connection and seed initial archive to Cloud if Firestore is empty
+    // Check connection and seed initial archive to Cloud if Firestore is empty,
+    // and auto-migrate any locally uploaded banners to Firestore so all external devices immediately see them!
     testConnection().then(async (connected) => {
       if (connected) {
         await seedArchiveIfEmpty(
@@ -531,13 +539,29 @@ export default function App() {
           sanitizeCategories(INITIAL_CATEGORIES),
           sanitizeAndUpgradeArtifacts(INITIAL_ARTIFACTS),
           sanitizeAndUpgradeQuestions(INITIAL_QUESTIONS),
-          INITIAL_ABOUT_CONTENT
+          INITIAL_ABOUT_CONTENT,
+          presentCategories,
+          presentArtifacts,
+          presentQuestions,
+          futureCategories,
+          futureArtifacts,
+          futureQuestions
+        );
+
+        // Auto-migrate custom uploaded banners / changes from this device's storage to Firestore
+        await autoMigrateLocalDataToFirestore(
+          presentCategories,
+          presentArtifacts,
+          presentQuestions,
+          futureCategories,
+          futureArtifacts,
+          futureQuestions
         );
       }
     });
 
     // Real-Time onSnapshot listener: When admin makes changes on ANY device,
-    // all connected guests and visitors see changes LIVE in real-time!
+    // all connected guests and visitors see changes LIVE in real-time across all eras!
     const unsubscribe = subscribeToArchive({
       onSlides: (cloudSlides) => {
         if (!isSubscribed) return;
@@ -587,6 +611,50 @@ export default function App() {
           ) {
             syncQuestionsDiff(cloudQuestions, upgraded);
           }
+        }
+      },
+      onPresentCategories: (cloudPresentCats) => {
+        if (!isSubscribed) return;
+        if (cloudPresentCats && cloudPresentCats.length > 0) {
+          setPresentCategories(cloudPresentCats);
+          setSelectedCategory((prev) => {
+            const match = cloudPresentCats.find((c) => c.id === prev.id);
+            return match && match.bannerImageUrl ? { ...prev, bannerImageUrl: match.bannerImageUrl } : prev;
+          });
+        }
+      },
+      onPresentArtifacts: (cloudPresentArts) => {
+        if (!isSubscribed) return;
+        if (cloudPresentArts && cloudPresentArts.length > 0) {
+          setPresentArtifacts(cloudPresentArts);
+        }
+      },
+      onPresentQuestions: (cloudPresentQs) => {
+        if (!isSubscribed) return;
+        if (cloudPresentQs && cloudPresentQs.length > 0) {
+          setPresentQuestions(cloudPresentQs);
+        }
+      },
+      onFutureCategories: (cloudFutureCats) => {
+        if (!isSubscribed) return;
+        if (cloudFutureCats && cloudFutureCats.length > 0) {
+          setFutureCategories(cloudFutureCats);
+          setSelectedCategory((prev) => {
+            const match = cloudFutureCats.find((c) => c.id === prev.id);
+            return match && match.bannerImageUrl ? { ...prev, bannerImageUrl: match.bannerImageUrl } : prev;
+          });
+        }
+      },
+      onFutureArtifacts: (cloudFutureArts) => {
+        if (!isSubscribed) return;
+        if (cloudFutureArts && cloudFutureArts.length > 0) {
+          setFutureArtifacts(cloudFutureArts);
+        }
+      },
+      onFutureQuestions: (cloudFutureQs) => {
+        if (!isSubscribed) return;
+        if (cloudFutureQs && cloudFutureQs.length > 0) {
+          setFutureQuestions(cloudFutureQs);
         }
       },
       onAbout: (cloudAbout) => {
@@ -768,6 +836,7 @@ export default function App() {
       const match = newCats.find((c) => c.id === prev.id);
       return match ? { ...prev, bannerImageUrl: match.bannerImageUrl } : prev;
     });
+    syncPresentCategoriesDiff(presentCategories, newCats);
   };
 
   const handleUpdateCategoryBanner = (catId: string, bannerUrl: string) => {
@@ -779,6 +848,7 @@ export default function App() {
       setSelectedCategory((prev) =>
         prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
       );
+      syncFutureCategoriesDiff(futureCategories, updated);
     } else if (activeEra === 'now') {
       const updated = presentCategories.map((c) =>
         c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
@@ -787,6 +857,7 @@ export default function App() {
       setSelectedCategory((prev) =>
         prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
       );
+      syncPresentCategoriesDiff(presentCategories, updated);
     } else {
       const updated = categories.map((c) =>
         c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
@@ -801,22 +872,27 @@ export default function App() {
 
   const handleUpdatePresentArtifacts = (newArts: Artifact[]) => {
     setPresentArtifacts(newArts);
+    syncPresentArtifactsDiff(presentArtifacts, newArts);
   };
 
   const handleUpdatePresentQuestions = (newQs: QuizQuestion[]) => {
     setPresentQuestions(newQs);
+    syncPresentQuestionsDiff(presentQuestions, newQs);
   };
 
   const handleUpdateFutureCategories = (newCats: Category[]) => {
     setFutureCategories(newCats);
+    syncFutureCategoriesDiff(futureCategories, newCats);
   };
 
   const handleUpdateFutureArtifacts = (newArts: Artifact[]) => {
     setFutureArtifacts(newArts);
+    syncFutureArtifactsDiff(futureArtifacts, newArts);
   };
 
   const handleUpdateFutureQuestions = (newQs: QuizQuestion[]) => {
     setFutureQuestions(newQs);
+    syncFutureQuestionsDiff(futureQuestions, newQs);
   };
 
   const handleUpdateAboutContent = (newAbout: AboutContent) => {
@@ -825,7 +901,19 @@ export default function App() {
   };
 
   const handleForceSyncCloud = async () => {
-    await syncAllToFirestore(slides, categories, artifacts, questions, aboutContent);
+    await syncAllToFirestore(
+      slides,
+      categories,
+      artifacts,
+      questions,
+      aboutContent,
+      presentCategories,
+      presentArtifacts,
+      presentQuestions,
+      futureCategories,
+      futureArtifacts,
+      futureQuestions
+    );
   };
 
   const handleResetDefaults = () => {
@@ -866,7 +954,13 @@ export default function App() {
       cleanCats,
       cleanArts,
       cleanQs,
-      INITIAL_ABOUT_CONTENT
+      INITIAL_ABOUT_CONTENT,
+      PRESENT_CATEGORIES,
+      PRESENT_ARTIFACTS,
+      PRESENT_QUESTIONS,
+      FUTURE_CATEGORIES,
+      FUTURE_ARTIFACTS,
+      FUTURE_QUESTIONS
     );
   };
 

@@ -225,13 +225,37 @@
       "schema": "Category",
       "description": "Collection of the 5 main pop culture topics."
     },
+    "/present_categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of Present Time (2026) pop culture topics."
+    },
+    "/future_categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of Future (2030-2040) pop culture topics."
+    },
     "/artifacts/{artifactId}": {
       "schema": "Artifact",
       "description": "Collection of cultural relics and archival items."
     },
+    "/present_artifacts/{artifactId}": {
+      "schema": "Artifact",
+      "description": "Collection of Present Time (2026) artifacts."
+    },
+    "/future_artifacts/{artifactId}": {
+      "schema": "Artifact",
+      "description": "Collection of Future (2030-2040) artifacts."
+    },
     "/questions/{questionId}": {
       "schema": "QuizQuestion",
       "description": "Collection of quiz trivia questions per category."
+    },
+    "/present_questions/{questionId}": {
+      "schema": "QuizQuestion",
+      "description": "Collection of Present Time (2026) quiz questions."
+    },
+    "/future_questions/{questionId}": {
+      "schema": "QuizQuestion",
+      "description": "Collection of Future (2030-2040) quiz questions."
     },
     "/config/about": {
       "schema": "AboutContent",
