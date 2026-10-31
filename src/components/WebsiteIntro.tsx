@@ -5,41 +5,108 @@ interface WebsiteIntroProps {
   onFinish: () => void;
 }
 
+const checkIsPortrait = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // 1. Explicit Screen Orientation API (modern standard for Chrome Android, Brave, etc.)
+  if (window.screen?.orientation?.type) {
+    if (window.screen.orientation.type.startsWith('portrait')) return true;
+    if (window.screen.orientation.type.startsWith('landscape')) return false;
+  }
+
+  // 2. Legacy window.orientation (mobile Safari / older Android WebViews)
+  if (typeof window.orientation === 'number') {
+    if (window.orientation === 0 || window.orientation === 180) return true;
+    if (window.orientation === 90 || window.orientation === -90) return false;
+  }
+
+  // 3. CSS Media Queries
+  if (typeof window.matchMedia === 'function') {
+    try {
+      if (window.matchMedia('(orientation: portrait)').matches) return true;
+      if (window.matchMedia('(orientation: landscape)').matches) return false;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 4. Visual Viewport dimensions (accurate with Android address bar & keyboard)
+  const vv = window.visualViewport;
+  const width = vv?.width || window.innerWidth || 0;
+  const height = vv?.height || window.innerHeight || 0;
+
+  if (height && width) {
+    return height >= width;
+  }
+
+  // 5. Physical screen dimensions fallback
+  if (window.screen?.height && window.screen?.width) {
+    return window.screen.height >= window.screen.width;
+  }
+
+  // 6. Mobile phone fallback: phones only browse PopPinoyArchives in portrait
+  const ua = (navigator.userAgent || '').toLowerCase();
+  if (/mobile|iphone|ipod|android.*mobile/i.test(ua)) {
+    return true;
+  }
+
+  return false;
+};
+
 export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   const [hasEntered, setHasEntered] = useState<boolean>(false);
-  const [isPortrait, setIsPortrait] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerHeight > window.innerWidth;
-    }
-    return false;
-  });
-
+  const [isPortrait, setIsPortrait] = useState<boolean>(checkIsPortrait);
   const [hasVideoError, setHasVideoError] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Update orientation if resized before playback starts
+  // Update orientation accurately on mount, resize, orientationchange, and visualViewport change
   useEffect(() => {
-    const handleResize = () => {
-      setIsPortrait(window.innerHeight > window.innerWidth);
+    const updateOrientation = () => {
+      setIsPortrait(checkIsPortrait());
     };
 
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
+    // Ensure immediate correct orientation calculation once DOM is ready
+    updateOrientation();
+
+    window.addEventListener('resize', updateOrientation);
+    window.addEventListener('orientationchange', updateOrientation);
+
+    // Modern Screen Orientation API listener
+    const screenOrientation = window.screen?.orientation;
+    if (screenOrientation?.addEventListener) {
+      screenOrientation.addEventListener('change', updateOrientation);
+    }
+
+    // Visual viewport listener for dynamic address bar changes on mobile Chrome
+    const visualViewport = window.visualViewport;
+    if (visualViewport?.addEventListener) {
+      visualViewport.addEventListener('resize', updateOrientation);
+    }
+
+    // MatchMedia listener
+    const mql = typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: portrait)') : null;
+    mql?.addEventListener?.('change', updateOrientation);
+
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('resize', updateOrientation);
+      window.removeEventListener('orientationchange', updateOrientation);
+      if (screenOrientation?.removeEventListener) {
+        screenOrientation.removeEventListener('change', updateOrientation);
+      }
+      if (visualViewport?.removeEventListener) {
+        visualViewport.removeEventListener('resize', updateOrientation);
+      }
+      mql?.removeEventListener?.('change', updateOrientation);
     };
   }, []);
 
   // Candidate video paths
-  // 1. Separate mp4 for landscape and portrait as requested
+  // Separate MP4 for landscape and portrait
   const portraitCandidates = [
     '/video/intro/intro-portrait.mp4',
     '/video/intro/portrait.mp4',
     '/intro/intro-portrait.mp4',
     '/intro/portrait.mp4',
-    '/video/intro/intro.mp4',
-    '/intro/intro.mp4',
   ];
 
   const landscapeCandidates = [
@@ -47,8 +114,6 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
     '/video/intro/landscape.mp4',
     '/intro/intro-landscape.mp4',
     '/intro/landscape.mp4',
-    '/video/intro/intro.mp4',
-    '/intro/intro.mp4',
   ];
 
   const [candidateIndex, setCandidateIndex] = useState(0);
@@ -90,13 +155,18 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
   };
 
   const handleEnterNow = () => {
+    // Re-verify orientation right when user taps ENTER NOW!
+    setIsPortrait(checkIsPortrait());
     setHasEntered(true);
   };
 
   // 1. Landing Screen BEFORE Opening Video: "ENTER NOW!"
   if (!hasEntered) {
     return (
-      <div className="fixed inset-0 z-[10000] w-screen h-screen bg-black overflow-hidden flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
+      <div
+        className="fixed inset-0 z-[10000] w-full h-[100dvh] min-h-[100dvh] bg-black overflow-hidden flex flex-col items-center justify-center p-6 text-center select-none"
+        style={{ height: '100dvh', minHeight: '100dvh' }}
+      >
         {/* Subtle ambient background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.12),transparent_65%)] pointer-events-none" />
 
@@ -117,26 +187,35 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
 
   // 2. Opening Video Playback Screen
   return (
-    <div className="fixed inset-0 z-[10000] w-screen h-screen bg-black overflow-hidden flex items-center justify-center select-none animate-fadeIn">
-      {/* If custom video is present, stretch to screen as requested */}
+    <div
+      className="fixed inset-0 z-[10000] w-full h-[100dvh] min-h-[100dvh] bg-white overflow-hidden flex items-center justify-center select-none"
+      style={{ height: '100dvh', minHeight: '100dvh' }}
+    >
+      {/* If custom video is present, cleanly center and scale within viewport */}
       {!hasVideoError ? (
-        <>
+        <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-white">
           <video
             ref={videoRef}
+            key={currentVideoSrc}
             src={currentVideoSrc}
             autoPlay
             playsInline
+            {...{ 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }}
             disablePictureInPicture
             disableRemotePlayback
             controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
             onEnded={onFinish}
             onError={handleVideoError}
-            // CSS object-fill stretches the video to the screen if not the same size
-            // pointer-events-none completely prevents Edge/Chrome from showing their native PiP & Video Enhance hover widget
-            className="w-full h-full object-fill absolute inset-0 block pointer-events-none"
+            className="w-full h-full object-contain pointer-events-none block"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              objectPosition: 'center',
+            }}
           />
 
-          {/* Full-screen transparent overlay to block Edge/Chrome hover video tools */}
+          {/* Full-screen transparent overlay to block Edge/Chrome hover video tools and allow tap-to-unmute */}
           <div
             className="absolute inset-0 z-20 w-full h-full bg-transparent cursor-pointer"
             onClick={() => {
@@ -149,7 +228,7 @@ export const WebsiteIntro: React.FC<WebsiteIntroProps> = ({ onFinish }) => {
               }
             }}
           />
-        </>
+        </div>
       ) : (
         /* Fallback 2000s Museum Splash if user hasn't added custom MP4 to /public/video/intro/ yet */
         <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-zinc-950 via-black to-zinc-950 text-white">
