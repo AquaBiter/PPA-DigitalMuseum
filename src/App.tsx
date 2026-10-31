@@ -764,6 +764,39 @@ export default function App() {
 
   const handleUpdatePresentCategories = (newCats: Category[]) => {
     setPresentCategories(newCats);
+    setSelectedCategory((prev) => {
+      const match = newCats.find((c) => c.id === prev.id);
+      return match ? { ...prev, bannerImageUrl: match.bannerImageUrl } : prev;
+    });
+  };
+
+  const handleUpdateCategoryBanner = (catId: string, bannerUrl: string) => {
+    if (activeEra === 'future') {
+      const updated = futureCategories.map((c) =>
+        c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
+      );
+      setFutureCategories(updated);
+      setSelectedCategory((prev) =>
+        prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
+      );
+    } else if (activeEra === 'now') {
+      const updated = presentCategories.map((c) =>
+        c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
+      );
+      setPresentCategories(updated);
+      setSelectedCategory((prev) =>
+        prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
+      );
+    } else {
+      const updated = categories.map((c) =>
+        c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
+      );
+      setCategories(updated);
+      setSelectedCategory((prev) =>
+        prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
+      );
+      syncCategoriesDiff(categories, updated);
+    }
   };
 
   const handleUpdatePresentArtifacts = (newArts: Artifact[]) => {
@@ -933,28 +966,7 @@ export default function App() {
               }}
               onOpenQuestions={() => navigateTo('questions')}
               onOpenThenAndNow={handleToggleEra}
-              onUpdateCategoryBanner={(catId, bannerUrl) => {
-                if (activeEra === 'future') {
-                  const updated = futureCategories.map((c) =>
-                    c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
-                  );
-                  setFutureCategories(updated);
-                } else if (activeEra === 'now') {
-                  const updated = presentCategories.map((c) =>
-                    c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
-                  );
-                  setPresentCategories(updated);
-                } else {
-                  const updated = categories.map((c) =>
-                    c.id === catId ? { ...c, bannerImageUrl: bannerUrl } : c
-                  );
-                  setCategories(updated);
-                  setSelectedCategory((prev) =>
-                    prev.id === catId ? { ...prev, bannerImageUrl: bannerUrl } : prev
-                  );
-                  syncCategoriesDiff(categories, updated);
-                }
-              }}
+              onUpdateCategoryBanner={handleUpdateCategoryBanner}
             />
           )}
 
@@ -976,7 +988,9 @@ export default function App() {
               artifact={currentArtifact}
               availableQuestions={categoryQuestions}
               isAdmin={isAdminLoggedIn}
+              activeEra={activeEra}
               onSelectQuestion={setSelectedQuestion}
+              onUpdateCategoryBanner={handleUpdateCategoryBanner}
               onUpdateQuestion={(updatedQ) => {
                 if (activeEra === 'future') {
                   const updated = futureQuestions.map((q) => (q.id === updatedQ.id ? updatedQ : q));

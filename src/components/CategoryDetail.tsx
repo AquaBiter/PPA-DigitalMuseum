@@ -362,19 +362,19 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
         <div className="md:col-span-6 lg:col-span-6 flex flex-col items-center sm:items-start">
           {/* Graphic Banner: Stylized illustration OR custom uploaded banner image (or blank for 2026 as requested) */}
           <div className="w-full aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden shadow-sm border border-zinc-200 bg-zinc-50 relative select-none flex items-center justify-center">
-            {activeEra === 'now' ? (
-              // Left blank for 2026 archive as requested
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-100/60">
-                <span className="text-zinc-400 font-semibold text-xs sm:text-sm tracking-widest uppercase">
-                  (Graphic Banner Left Blank for 2026 Archive)
-                </span>
-              </div>
-            ) : category.bannerImageUrl ? (
+            {category.bannerImageUrl ? (
               <img
                 src={category.bannerImageUrl}
                 alt={category.name}
                 className="w-full h-full object-cover"
               />
+            ) : activeEra === 'now' ? (
+              // Left blank for 2026 archive as requested when no custom banner is uploaded
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-100/60">
+                <span className="text-zinc-400 font-semibold text-xs sm:text-sm tracking-widest uppercase">
+                  (Graphic Banner Left Blank for 2026 Archive)
+                </span>
+              </div>
             ) : (
               <svg
                 className="w-full h-full object-cover"
@@ -440,7 +440,7 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
 
           {/* Change Banner Graphic Option (Admin Only) */}
           {isAdmin && onUpdateCategoryBanner && (
-            <div className="mt-2.5 flex items-center">
+            <div className="mt-2.5 flex items-center gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -455,8 +455,18 @@ export const CategoryDetail: React.FC<CategoryDetailProps> = ({
                 title="Change banner graphic or illustration"
               >
                 <Camera className="w-3.5 h-3.5 text-zinc-500" />
-                <span>Change Banner Graphic</span>
+                <span>{category.bannerImageUrl ? 'Change Banner Graphic' : 'Upload Banner Graphic'}</span>
               </button>
+              {category.bannerImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => onUpdateCategoryBanner(category.id, '')}
+                  className="text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                  title="Remove custom banner graphic"
+                >
+                  Remove
+                </button>
+              )}
             </div>
           )}
 

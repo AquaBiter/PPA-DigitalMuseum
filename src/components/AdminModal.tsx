@@ -1985,7 +1985,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   {/* Category Banner Graphic (Replace reference illustration) */}
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-500 mb-1">
-                      Banner Illustration / Image (Default: Rolling Hills Vector)
+                      {selectedEra === 'now'
+                        ? 'Archive Graphic Banner (Default: Blank Banner)'
+                        : 'Banner Illustration / Image (Default: Rolling Hills Vector)'}
                     </label>
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <button
@@ -2002,7 +2004,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           onClick={() => handleUpdateCategoryField(cat.id, 'bannerImageUrl', '')}
                           className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 rounded bg-red-50 hover:bg-red-100 cursor-pointer"
                         >
-                          Reset to Vector Illustration
+                          {selectedEra === 'now' ? 'Reset to Blank Banner' : 'Reset to Vector Illustration'}
                         </button>
                       )}
                     </div>

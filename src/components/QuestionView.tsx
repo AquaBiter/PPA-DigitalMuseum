@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { RotateCcw, CheckCircle2, AlertCircle, HelpCircle, ArrowRight, Camera, Lock, Check, Volume2, VolumeX } from 'lucide-react';
-import { QuizQuestion, Artifact, Category } from '../types';
+import { QuizQuestion, Artifact, Category, EraMode } from '../types';
 import { DEFAULT_CATEGORY_BANNER_SVG } from '../data/initialData';
 import { playInteractionSound, toggleQuizMusicMute, getIsQuizMuted } from '../utils/audioManager';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -11,8 +11,10 @@ interface QuestionViewProps {
   artifact?: Artifact;
   availableQuestions: QuizQuestion[];
   isAdmin?: boolean;
+  activeEra?: EraMode;
   onSelectQuestion: (q: QuizQuestion) => void;
   onUpdateQuestion?: (updated: QuizQuestion) => void;
+  onUpdateCategoryBanner?: (catId: string, bannerUrl: string) => void;
   onNavigateToAdmin?: () => void;
 }
 
@@ -22,8 +24,10 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
   artifact,
   availableQuestions,
   isAdmin = false,
+  activeEra = 'then',
   onSelectQuestion,
   onUpdateQuestion,
+  onUpdateCategoryBanner,
   onNavigateToAdmin,
 }) => {
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
@@ -101,18 +105,24 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !question || !onUpdateQuestion) return;
+    if (!file || !question) return;
 
     try {
       const dataUrl = await compressImageFile(file, {
-        maxWidth: 1000,
+        maxWidth: 1200,
         maxHeight: 800,
         quality: 0.78,
       });
-      onUpdateQuestion({
-        ...question,
-        imageUrl: dataUrl,
-      });
+      if (onUpdateQuestion) {
+        onUpdateQuestion({
+          ...question,
+          imageUrl: dataUrl,
+        });
+      }
+      // Synchronize category banner graphic with the quiz visual reference
+      if (onUpdateCategoryBanner) {
+        onUpdateCategoryBanner(category.id, dataUrl);
+      }
     } catch (err) {
       console.error('Failed to compress question image:', err);
     } finally {
@@ -149,7 +159,15 @@ export const QuestionView: React.FC<QuestionViewProps> = ({
   const isCorrect = selectedChoiceId === question.correctChoiceId;
   const cleanQuestionText = question.questionText.replace(/^(ex\.|ex)\s*/i, '');
   const currentIndex = availableQuestions.findIndex((q) => q.id === question.id);
-  const displayImageUrl = question.imageUrl || category.bannerImageUrl || DEFAULT_CATEGORY_BANNER_SVG;
+
+  // Priority for quiz visual reference:
+  // 1. Archive's uploaded graphic banner (category.bannerImageUrl) - so any image uploaded in the present time archives is used in the specific archive's quiz/question
+  // 2. Question-specific uploaded reference image (question.imageUrl)
+  // 3. Retro era fallback: Rolling hills vector graphic; Present era fallback: Empty clean placeholder if no custom banner uploaded yet
+  const displayImageUrl =
+    category.bannerImageUrl ||
+    question.imageUrl ||
+    (activeEra === 'now' ? '' : DEFAULT_CATEGORY_BANNER_SVG);
 
   // Question progression check: A question is unlocked ONLY IF all previous questions are passed
   const isQuestionUnlocked = (idx: number) => {
